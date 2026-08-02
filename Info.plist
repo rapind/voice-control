@@ -27,7 +27,7 @@
     <key>NSMicrophoneUsageDescription</key>
     <string>Listen for configured voice commands and record prompts for local transcription.</string>
     <key>NSAppleEventsUsageDescription</key>
-    <string>Bring Ghostty forward before pasting and submitting a spoken prompt.</string>
+    <string>Bring the configured application forward before sending a spoken prompt.</string>
     <key>NSSpeechRecognitionUsageDescription</key>
     <string>Recognize only the configured wake and submit phrases.</string>
 </dict>

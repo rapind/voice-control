@@ -14,7 +14,7 @@ enum VoicePhase: Equatable, CustomStringConvertible {
     case .waitingForWake: return "waiting for wake phrase"
     case .recording: return "recording prompt"
     case .transcribing: return "transcribing"
-    case .injecting: return "sending to Ghostty"
+    case .injecting: return "sending to target application"
     case .failed(let message): return "error: \(message)"
     }
   }
@@ -27,7 +27,7 @@ enum VoiceEvent {
   case cancelDetected
   case silenceExpired
   case maximumDurationExpired
-  case commandDetected(GhosttyCommand)
+  case commandDetected(ApplicationCommand)
   case transcriptionSucceeded(String)
   case failed(String)
   case injectionCompleted
@@ -39,7 +39,7 @@ enum VoiceEffect {
   case beginPromptRecording
   case stopAndTranscribe
   case cancelPromptRecording
-  case executeCommand(GhosttyCommand)
+  case executeCommand(ApplicationCommand)
   case inject(String)
   case reportError(String)
 }

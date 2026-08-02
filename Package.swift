@@ -28,7 +28,7 @@ let package = Package(
         .product(name: "Testing", package: "swift-testing"),
       ],
       path: "Tests/VoiceControlDaemonTests"
-    )
+    ),
   ],
   swiftLanguageModes: [.v5]
 )

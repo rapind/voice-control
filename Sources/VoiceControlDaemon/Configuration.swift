@@ -3,50 +3,66 @@ import TOMLDecoder
 
 struct CommandPhrases: Equatable {
   var focus: [String]
-  var newTab: [String]
-  var nextTab: [String]
-  var previousTab: [String]
-  var focusTab1: [String]
-  var focusTab2: [String]
-  var focusTab3: [String]
-  var focusTab4: [String]
-  var focusTab5: [String]
-  var focusTab6: [String]
-  var focusTab7: [String]
-  var focusTab8: [String]
-  var focusTab9: [String]
+  var newChat: [String]
+  var next: [String]
+  var previous: [String]
+  var focus1: [String]
+  var focus2: [String]
+  var focus3: [String]
+  var focus4: [String]
+  var focus5: [String]
+  var focus6: [String]
+  var focus7: [String]
+  var focus8: [String]
+  var focus9: [String]
 
-  static let defaults = CommandPhrases(
+  static let ghosttyDefaults = CommandPhrases(
     focus: ["focus ghostty", "focus ghostee", "show ghostty", "show ghostee"],
-    newTab: ["new tab", "open new tab"],
-    nextTab: ["next tab"],
-    previousTab: ["previous tab", "prev tab"],
-    focusTab1: ["focus tab 1", "tab 1"],
-    focusTab2: ["focus tab 2", "tab 2"],
-    focusTab3: ["focus tab 3", "tab 3"],
-    focusTab4: ["focus tab 4", "tab 4"],
-    focusTab5: ["focus tab 5", "tab 5"],
-    focusTab6: ["focus tab 6", "tab 6"],
-    focusTab7: ["focus tab 7", "tab 7"],
-    focusTab8: ["focus tab 8", "tab 8"],
-    focusTab9: ["focus tab 9", "tab 9"]
+    newChat: ["new chat"],
+    next: ["focus next"],
+    previous: ["focus previous", "focus prev"],
+    focus1: ["focus 1"],
+    focus2: ["focus 2"],
+    focus3: ["focus 3"],
+    focus4: ["focus 4"],
+    focus5: ["focus 5"],
+    focus6: ["focus 6"],
+    focus7: ["focus 7"],
+    focus8: ["focus 8"],
+    focus9: ["focus 9"]
   )
 
-  var mappings: [(GhosttyCommand, [String])] {
+  static let chatGPTDefaults = CommandPhrases(
+    focus: ["focus chatgpt", "show chatgpt"],
+    newChat: ["new chat"],
+    next: [],
+    previous: [],
+    focus1: ["focus 1"],
+    focus2: ["focus 2"],
+    focus3: ["focus 3"],
+    focus4: ["focus 4"],
+    focus5: ["focus 5"],
+    focus6: ["focus 6"],
+    focus7: ["focus 7"],
+    focus8: ["focus 8"],
+    focus9: ["focus 9"]
+  )
+
+  var mappings: [(ApplicationCommand, [String])] {
     [
       (.focus, focus),
-      (.newTab, newTab),
-      (.nextTab, nextTab),
-      (.previousTab, previousTab),
-      (.focusTab(1), focusTab1),
-      (.focusTab(2), focusTab2),
-      (.focusTab(3), focusTab3),
-      (.focusTab(4), focusTab4),
-      (.focusTab(5), focusTab5),
-      (.focusTab(6), focusTab6),
-      (.focusTab(7), focusTab7),
-      (.focusTab(8), focusTab8),
-      (.focusTab(9), focusTab9),
+      (.newChat, newChat),
+      (.nextItem, next),
+      (.previousItem, previous),
+      (.focusItem(1), focus1),
+      (.focusItem(2), focus2),
+      (.focusItem(3), focus3),
+      (.focusItem(4), focus4),
+      (.focusItem(5), focus5),
+      (.focusItem(6), focus6),
+      (.focusItem(7), focus7),
+      (.focusItem(8), focus8),
+      (.focusItem(9), focus9),
     ]
   }
 
@@ -56,26 +72,32 @@ struct CommandPhrases: Equatable {
 }
 
 struct Configuration: Equatable {
+  var target: ApplicationTarget
   var wakePhrases: [String]
   var submitPhrases: [String]
   var cancelPhrases: [String]
   var silenceSeconds: TimeInterval
   var silenceThresholdDB: Float
   var maximumRecordingSeconds: TimeInterval
-  var commands: CommandPhrases
+  var applicationCommands: [ApplicationTarget: CommandPhrases]
 
   static let defaults = Configuration(
+    target: .ghostty,
     wakePhrases: ["ghostee", "ghostty", "ghostie", "ghosty", "ghost tea"],
     submitPhrases: ["ghost it"],
     cancelPhrases: ["ghost cancel"],
     silenceSeconds: 4,
     silenceThresholdDB: -42,
     maximumRecordingSeconds: 90,
-    commands: .defaults
+    applicationCommands: [
+      .ghostty: .ghosttyDefaults,
+      .chatGPT: .chatGPTDefaults,
+    ]
   )
 
   static let defaultTOML = """
     # Voice Control reloads this file automatically after you save it.
+    target = "ghostty"
     wake = ["ghostee", "ghostty", "ghostie", "ghosty", "ghost tea"]
     submit = ["ghost it"]
     cancel = ["ghost cancel"]
@@ -84,20 +106,33 @@ struct Configuration: Equatable {
     silence_threshold_db = -42
     maximum_recording_seconds = 90
 
-    [commands]
+    [applications.ghostty.commands]
     focus = ["focus ghostty", "focus ghostee", "show ghostty", "show ghostee"]
-    new_tab = ["new tab", "open new tab"]
-    next_tab = ["next tab"]
-    previous_tab = ["previous tab", "prev tab"]
-    focus_tab_1 = ["focus tab 1", "tab 1"]
-    focus_tab_2 = ["focus tab 2", "tab 2"]
-    focus_tab_3 = ["focus tab 3", "tab 3"]
-    focus_tab_4 = ["focus tab 4", "tab 4"]
-    focus_tab_5 = ["focus tab 5", "tab 5"]
-    focus_tab_6 = ["focus tab 6", "tab 6"]
-    focus_tab_7 = ["focus tab 7", "tab 7"]
-    focus_tab_8 = ["focus tab 8", "tab 8"]
-    focus_tab_9 = ["focus tab 9", "tab 9"]
+    new_chat = ["new chat"]
+    next = ["focus next"]
+    previous = ["focus previous", "focus prev"]
+    focus_1 = ["focus 1"]
+    focus_2 = ["focus 2"]
+    focus_3 = ["focus 3"]
+    focus_4 = ["focus 4"]
+    focus_5 = ["focus 5"]
+    focus_6 = ["focus 6"]
+    focus_7 = ["focus 7"]
+    focus_8 = ["focus 8"]
+    focus_9 = ["focus 9"]
+
+    [applications.chatgpt.commands]
+    focus = ["focus chatgpt", "show chatgpt"]
+    new_chat = ["new chat"]
+    focus_1 = ["focus 1"]
+    focus_2 = ["focus 2"]
+    focus_3 = ["focus 3"]
+    focus_4 = ["focus 4"]
+    focus_5 = ["focus 5"]
+    focus_6 = ["focus 6"]
+    focus_7 = ["focus 7"]
+    focus_8 = ["focus 8"]
+    focus_9 = ["focus 9"]
     """
 
   static var defaultFileURL: URL {
@@ -105,8 +140,12 @@ struct Configuration: Equatable {
       .appendingPathComponent(".config/voice-control/config.toml")
   }
 
+  var activeCommands: CommandPhrases {
+    applicationCommands[target]!
+  }
+
   var contextualPhrases: [String] {
-    wakePhrases + submitPhrases + cancelPhrases + commands.allPhrases
+    wakePhrases + submitPhrases + cancelPhrases + activeCommands.allPhrases
   }
 
   static func decodeTOML(_ data: Data) throws -> Configuration {
@@ -116,11 +155,15 @@ struct Configuration: Equatable {
     } catch {
       throw ConfigurationError("Invalid TOML: \(error.localizedDescription)")
     }
+    guard raw.commands == nil else {
+      throw ConfigurationError(
+        "[commands] is invalid; put commands under [applications.ghostty.commands] or [applications.chatgpt.commands]"
+      )
+    }
 
     let defaults = Configuration.defaults
-    let commandDefaults = defaults.commands
-    let rawCommands = raw.commands
     var configuration = Configuration(
+      target: raw.target ?? defaults.target,
       wakePhrases: raw.wake ?? defaults.wakePhrases,
       submitPhrases: raw.submit ?? defaults.submitPhrases,
       cancelPhrases: raw.cancel ?? defaults.cancelPhrases,
@@ -128,24 +171,39 @@ struct Configuration: Equatable {
       silenceThresholdDB: Float(raw.silenceThresholdDB ?? Double(defaults.silenceThresholdDB)),
       maximumRecordingSeconds: raw.maximumRecordingSeconds
         ?? defaults.maximumRecordingSeconds,
-      commands: CommandPhrases(
-        focus: rawCommands?.focus ?? commandDefaults.focus,
-        newTab: rawCommands?.newTab ?? commandDefaults.newTab,
-        nextTab: rawCommands?.nextTab ?? commandDefaults.nextTab,
-        previousTab: rawCommands?.previousTab ?? commandDefaults.previousTab,
-        focusTab1: rawCommands?.focusTab1 ?? commandDefaults.focusTab1,
-        focusTab2: rawCommands?.focusTab2 ?? commandDefaults.focusTab2,
-        focusTab3: rawCommands?.focusTab3 ?? commandDefaults.focusTab3,
-        focusTab4: rawCommands?.focusTab4 ?? commandDefaults.focusTab4,
-        focusTab5: rawCommands?.focusTab5 ?? commandDefaults.focusTab5,
-        focusTab6: rawCommands?.focusTab6 ?? commandDefaults.focusTab6,
-        focusTab7: rawCommands?.focusTab7 ?? commandDefaults.focusTab7,
-        focusTab8: rawCommands?.focusTab8 ?? commandDefaults.focusTab8,
-        focusTab9: rawCommands?.focusTab9 ?? commandDefaults.focusTab9
-      )
+      applicationCommands: [
+        .ghostty: commandPhrases(
+          raw.applications?.ghostty?.commands,
+          defaults: defaults.applicationCommands[.ghostty]!
+        ),
+        .chatGPT: commandPhrases(
+          raw.applications?.chatGPT?.commands,
+          defaults: defaults.applicationCommands[.chatGPT]!
+        ),
+      ]
     )
     try configuration.validateAndNormalize()
     return configuration
+  }
+
+  private static func commandPhrases(
+    _ raw: RawCommandPhrases?, defaults: CommandPhrases
+  ) -> CommandPhrases {
+    CommandPhrases(
+      focus: raw?.focus ?? defaults.focus,
+      newChat: raw?.newChat ?? defaults.newChat,
+      next: raw?.next ?? defaults.next,
+      previous: raw?.previous ?? defaults.previous,
+      focus1: raw?.focus1 ?? defaults.focus1,
+      focus2: raw?.focus2 ?? defaults.focus2,
+      focus3: raw?.focus3 ?? defaults.focus3,
+      focus4: raw?.focus4 ?? defaults.focus4,
+      focus5: raw?.focus5 ?? defaults.focus5,
+      focus6: raw?.focus6 ?? defaults.focus6,
+      focus7: raw?.focus7 ?? defaults.focus7,
+      focus8: raw?.focus8 ?? defaults.focus8,
+      focus9: raw?.focus9 ?? defaults.focus9
+    )
   }
 
   static func ensureDefaultFile(at url: URL) throws {
@@ -190,19 +248,29 @@ struct Configuration: Equatable {
     submitPhrases = try Self.controlPhrases(submitPhrases, name: "submit")
     cancelPhrases = try Self.controlPhrases(cancelPhrases, name: "cancel")
 
-    commands.focus = Self.normalizedPhrases(commands.focus)
-    commands.newTab = Self.normalizedPhrases(commands.newTab)
-    commands.nextTab = Self.normalizedPhrases(commands.nextTab)
-    commands.previousTab = Self.normalizedPhrases(commands.previousTab)
-    commands.focusTab1 = Self.normalizedPhrases(commands.focusTab1)
-    commands.focusTab2 = Self.normalizedPhrases(commands.focusTab2)
-    commands.focusTab3 = Self.normalizedPhrases(commands.focusTab3)
-    commands.focusTab4 = Self.normalizedPhrases(commands.focusTab4)
-    commands.focusTab5 = Self.normalizedPhrases(commands.focusTab5)
-    commands.focusTab6 = Self.normalizedPhrases(commands.focusTab6)
-    commands.focusTab7 = Self.normalizedPhrases(commands.focusTab7)
-    commands.focusTab8 = Self.normalizedPhrases(commands.focusTab8)
-    commands.focusTab9 = Self.normalizedPhrases(commands.focusTab9)
+    for target in [ApplicationTarget.ghostty, .chatGPT] {
+      var commands = applicationCommands[target]!
+      commands.focus = Self.normalizedPhrases(commands.focus)
+      commands.newChat = Self.normalizedPhrases(commands.newChat)
+      commands.next = Self.normalizedPhrases(commands.next)
+      commands.previous = Self.normalizedPhrases(commands.previous)
+      commands.focus1 = Self.normalizedPhrases(commands.focus1)
+      commands.focus2 = Self.normalizedPhrases(commands.focus2)
+      commands.focus3 = Self.normalizedPhrases(commands.focus3)
+      commands.focus4 = Self.normalizedPhrases(commands.focus4)
+      commands.focus5 = Self.normalizedPhrases(commands.focus5)
+      commands.focus6 = Self.normalizedPhrases(commands.focus6)
+      commands.focus7 = Self.normalizedPhrases(commands.focus7)
+      commands.focus8 = Self.normalizedPhrases(commands.focus8)
+      commands.focus9 = Self.normalizedPhrases(commands.focus9)
+      applicationCommands[target] = commands
+    }
+    let chatGPTCommands = applicationCommands[.chatGPT]!
+    guard chatGPTCommands.next.isEmpty, chatGPTCommands.previous.isEmpty else {
+      throw ConfigurationError(
+        "ChatGPT does not support next or previous commands; use focus_1 through focus_9"
+      )
+    }
 
     guard silenceSeconds >= 1 else {
       throw ConfigurationError("silence_seconds must be at least 1")
@@ -214,22 +282,24 @@ struct Configuration: Equatable {
       throw ConfigurationError("maximum_recording_seconds must be at least 5")
     }
 
-    var owners: [String: String] = [:]
-    let groups: [(String, [String])] =
-      [
-        ("wake", wakePhrases),
-        ("submit", submitPhrases),
-        ("cancel", cancelPhrases),
-      ] + commands.mappings.map { ("command \($0.0)", $0.1) }
-    for (owner, phrases) in groups {
-      for phrase in phrases {
-        let normalized = PhraseMatcher.normalize(phrase)
-        if let existingOwner = owners[normalized], existingOwner != owner {
-          throw ConfigurationError(
-            "Phrase \"\(phrase)\" is assigned to both \(existingOwner) and \(owner)"
-          )
+    for target in [ApplicationTarget.ghostty, .chatGPT] {
+      var owners: [String: String] = [:]
+      let groups: [(String, [String])] =
+        [
+          ("wake", wakePhrases),
+          ("submit", submitPhrases),
+          ("cancel", cancelPhrases),
+        ] + applicationCommands[target]!.mappings.map { ("command \($0.0)", $0.1) }
+      for (owner, phrases) in groups {
+        for phrase in phrases {
+          let normalized = PhraseMatcher.normalize(phrase)
+          if let existingOwner = owners[normalized], existingOwner != owner {
+            throw ConfigurationError(
+              "Phrase \"\(phrase)\" is assigned to both \(existingOwner) and \(owner) for \(target.rawValue)"
+            )
+          }
+          owners[normalized] = owner
         }
-        owners[normalized] = owner
       }
     }
   }
@@ -254,51 +324,65 @@ struct Configuration: Equatable {
 }
 
 private struct RawConfiguration: Decodable {
+  var target: ApplicationTarget?
   var wake: [String]?
   var submit: [String]?
   var cancel: [String]?
   var silenceSeconds: Double?
   var silenceThresholdDB: Double?
   var maximumRecordingSeconds: Double?
+  var applications: RawApplications?
   var commands: RawCommandPhrases?
 
   enum CodingKeys: String, CodingKey {
-    case wake, submit, cancel, commands
+    case target, wake, submit, cancel, applications, commands
     case silenceSeconds = "silence_seconds"
     case silenceThresholdDB = "silence_threshold_db"
     case maximumRecordingSeconds = "maximum_recording_seconds"
   }
 }
 
-private struct RawCommandPhrases: Decodable {
-  var focus: [String]?
-  var newTab: [String]?
-  var nextTab: [String]?
-  var previousTab: [String]?
-  var focusTab1: [String]?
-  var focusTab2: [String]?
-  var focusTab3: [String]?
-  var focusTab4: [String]?
-  var focusTab5: [String]?
-  var focusTab6: [String]?
-  var focusTab7: [String]?
-  var focusTab8: [String]?
-  var focusTab9: [String]?
+private struct RawApplications: Decodable {
+  var ghostty: RawApplication?
+  var chatGPT: RawApplication?
 
   enum CodingKeys: String, CodingKey {
-    case focus
-    case newTab = "new_tab"
-    case nextTab = "next_tab"
-    case previousTab = "previous_tab"
-    case focusTab1 = "focus_tab_1"
-    case focusTab2 = "focus_tab_2"
-    case focusTab3 = "focus_tab_3"
-    case focusTab4 = "focus_tab_4"
-    case focusTab5 = "focus_tab_5"
-    case focusTab6 = "focus_tab_6"
-    case focusTab7 = "focus_tab_7"
-    case focusTab8 = "focus_tab_8"
-    case focusTab9 = "focus_tab_9"
+    case ghostty
+    case chatGPT = "chatgpt"
+  }
+}
+
+private struct RawApplication: Decodable {
+  var commands: RawCommandPhrases?
+}
+
+private struct RawCommandPhrases: Decodable {
+  var focus: [String]?
+  var newChat: [String]?
+  var next: [String]?
+  var previous: [String]?
+  var focus1: [String]?
+  var focus2: [String]?
+  var focus3: [String]?
+  var focus4: [String]?
+  var focus5: [String]?
+  var focus6: [String]?
+  var focus7: [String]?
+  var focus8: [String]?
+  var focus9: [String]?
+
+  enum CodingKeys: String, CodingKey {
+    case focus, next, previous
+    case newChat = "new_chat"
+    case focus1 = "focus_1"
+    case focus2 = "focus_2"
+    case focus3 = "focus_3"
+    case focus4 = "focus_4"
+    case focus5 = "focus_5"
+    case focus6 = "focus_6"
+    case focus7 = "focus_7"
+    case focus8 = "focus_8"
+    case focus9 = "focus_9"
   }
 }
 

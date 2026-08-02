@@ -9,7 +9,7 @@ final class VoiceController {
   private var pendingConfiguration: Configuration?
   private let audio = AudioCapture()
   private let keywords: KeywordListener
-  private let injector = GhosttyInjector()
+  private let applicationController = ApplicationController()
   private let transcriber = ParakeetTranscriber()
   private var machine = VoiceStateMachine()
   private var modelReady = false
@@ -50,7 +50,7 @@ final class VoiceController {
 
   func start() {
     printConfiguration()
-    _ = injector.requestAccessibilityPermission()
+    _ = applicationController.requestAccessibilityPermission()
     requestVoicePermissions()
 
     Task { @MainActor in
@@ -142,7 +142,7 @@ final class VoiceController {
       }
 
     case .beginPromptRecording:
-      targetPID = injector.captureTargetPID()
+      targetPID = applicationController.captureTargetPID(for: configuration.target)
       heardPromptSpeech = false
       recordingStartedAt = Date()
       ignoreSilenceUntil = Date().addingTimeInterval(0.6)
@@ -151,7 +151,8 @@ final class VoiceController {
         try audio.beginRecording()
         NSSound(named: "Tink")?.play()
         startSilenceTimer()
-        injector.focus(targetPID: targetPID) { [weak self] result in
+        applicationController.focus(configuration.target, targetPID: targetPID) {
+          [weak self] result in
           DispatchQueue.main.async {
             guard let self, self.machine.phase == .recording else { return }
             if case .failure(let error) = result {
@@ -182,15 +183,17 @@ final class VoiceController {
       NSSound(named: "Pop")?.play()
 
     case .inject(let text):
-      if let command = GhosttyCommand.parse(
+      if let command = ApplicationCommand.parse(
         text,
         wakePhrases: configuration.wakePhrases,
-        commands: configuration.commands
+        commands: configuration.activeCommands
       ) {
         execute(command)
       } else {
-        injector.inject(text, targetPID: targetPID) { [weak self] result in
-          self?.completeGhosttyOperation(result)
+        applicationController.inject(
+          text, into: configuration.target, targetPID: targetPID
+        ) { [weak self] result in
+          self?.completeApplicationOperation(result)
         }
       }
 
@@ -226,12 +229,12 @@ final class VoiceController {
       } else if PhraseMatcher.contains(any: configuration.submitPhrases, in: transcript) {
         print("Submit phrase detected")
         dispatch(.submitDetected)
-      } else if let command = GhosttyCommand.parse(
+      } else if let command = ApplicationCommand.parse(
         transcript,
         wakePhrases: configuration.wakePhrases,
-        commands: configuration.commands
+        commands: configuration.activeCommands
       ) {
-        print("Ghostty command detected: \(command)")
+        print("\(configuration.target.displayName) command detected: \(command)")
         dispatch(.commandDetected(command))
       }
     default:
@@ -289,9 +292,11 @@ final class VoiceController {
     }
   }
 
-  private func execute(_ command: GhosttyCommand) {
-    injector.execute(command, targetPID: targetPID) { [weak self] result in
-      self?.completeGhosttyOperation(result)
+  private func execute(_ command: ApplicationCommand) {
+    applicationController.execute(
+      command, for: configuration.target, targetPID: targetPID
+    ) { [weak self] result in
+      self?.completeApplicationOperation(result)
     }
   }
 
@@ -317,7 +322,7 @@ final class VoiceController {
     }
   }
 
-  private func completeGhosttyOperation(_ result: Result<Void, Error>) {
+  private func completeApplicationOperation(_ result: Result<Void, Error>) {
     DispatchQueue.main.async {
       switch result {
       case .success:
@@ -347,6 +352,7 @@ final class VoiceController {
 
   private func printConfiguration() {
     print("Voice Control Prototype")
+    print("  target: \(configuration.target.displayName)")
     print("  wake phrases: \(configuration.wakePhrases.joined(separator: ", "))")
     print("  submit phrases: \(configuration.submitPhrases.joined(separator: ", "))")
     print("  cancel phrases: \(configuration.cancelPhrases.joined(separator: ", "))")

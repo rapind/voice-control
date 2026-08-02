@@ -3,39 +3,38 @@ import ApplicationServices
 import Foundation
 import OSLog
 
-final class GhosttyInjector {
+final class ApplicationController {
   private let logger = Logger(
     subsystem: "com.daverapin.voice-control-prototype",
-    category: "GhosttyInjector"
+    category: "ApplicationController"
   )
-  private let ghosttyBundleIdentifiers = [
-    "com.mitchellh.ghostty",
-    "com.mitchellh.ghostty.debug",
-  ]
 
   func requestAccessibilityPermission() -> Bool {
     let key = kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String
     return AXIsProcessTrustedWithOptions([key: true] as CFDictionary)
   }
 
-  func captureTargetPID() -> pid_t? {
-    if let frontmost = NSWorkspace.shared.frontmostApplication, isGhostty(frontmost) {
+  func captureTargetPID(for target: ApplicationTarget) -> pid_t? {
+    if let frontmost = NSWorkspace.shared.frontmostApplication,
+      isTarget(frontmost, target: target)
+    {
       return frontmost.processIdentifier
     }
     return NSWorkspace.shared.runningApplications
-      .first(where: isGhostty)?
+      .first(where: { isTarget($0, target: target) })?
       .processIdentifier
   }
 
   func focus(
+    _ target: ApplicationTarget,
     targetPID: pid_t?, completion: @escaping (Result<Void, Error>) -> Void
   ) {
     guard AXIsProcessTrusted() else {
       completion(.failure(InjectionError("Accessibility permission is not granted")))
       return
     }
-    guard let app = resolveTarget(targetPID) else {
-      completion(.failure(InjectionError("Ghostty is not running")))
+    guard let app = resolveTarget(target, pid: targetPID) else {
+      completion(.failure(InjectionError("\(target.displayName) is not running")))
       return
     }
 
@@ -43,7 +42,7 @@ final class GhosttyInjector {
       "Targeting \(app.localizedName ?? "unknown", privacy: .public) pid=\(app.processIdentifier, privacy: .public)"
     )
     do {
-      try requestFocus(app)
+      try requestFocus(app, target: target)
     } catch {
       completion(.failure(error))
       return
@@ -51,59 +50,38 @@ final class GhosttyInjector {
     waitUntilFrontmost(app, attemptsRemaining: 40) { [weak self] focused in
       guard let self else { return }
       guard focused else {
-        completion(.failure(InjectionError("Ghostty did not become the frontmost app")))
+        completion(
+          .failure(InjectionError("\(target.displayName) did not become the frontmost app")))
         return
       }
-      self.logger.notice("Ghostty is frontmost")
+      self.logger.notice("\(target.displayName, privacy: .public) is frontmost")
       completion(.success(()))
     }
   }
 
   func inject(
-    _ text: String, targetPID: pid_t?, completion: @escaping (Result<Void, Error>) -> Void
+    _ text: String,
+    into target: ApplicationTarget,
+    targetPID: pid_t?, completion: @escaping (Result<Void, Error>) -> Void
   ) {
-    focus(targetPID: targetPID) { [weak self] focusResult in
+    focus(target, targetPID: targetPID) { [weak self] focusResult in
       guard let self else { return }
       if case .failure(let error) = focusResult {
         completion(.failure(error))
         return
       }
 
-      let pasteboard = NSPasteboard.general
-      let savedItems = self.copyPasteboardItems(pasteboard.pasteboardItems ?? [])
-      pasteboard.clearContents()
-      guard pasteboard.setString(text, forType: .string) else {
-        completion(.failure(InjectionError("Could not place the prompt on the clipboard")))
-        return
-      }
-
-      DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-        guard self.postKey(keyCode: 9, flags: .maskCommand) else {
-          self.restorePasteboard(pasteboard, items: savedItems)
-          completion(.failure(InjectionError("Could not send Command-V to Ghostty")))
-          return
-        }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
-          guard self.postKey(keyCode: 36, flags: []) else {
-            self.restorePasteboard(pasteboard, items: savedItems)
-            completion(.failure(InjectionError("Could not send Return to Ghostty")))
-            return
-          }
-          DispatchQueue.main.asyncAfter(deadline: .now() + 0.75) {
-            self.restorePasteboard(pasteboard, items: savedItems)
-          }
-          completion(.success(()))
-        }
-      }
+      self.pasteAndSubmit(text, to: target, delay: 0.15, completion: completion)
     }
   }
 
   func execute(
-    _ command: GhosttyCommand,
+    _ command: ApplicationCommand,
+    for target: ApplicationTarget,
     targetPID: pid_t?,
     completion: @escaping (Result<Void, Error>) -> Void
   ) {
-    focus(targetPID: targetPID) { [weak self] focusResult in
+    focus(target, targetPID: targetPID) { [weak self] focusResult in
       guard let self else { return }
       if case .failure(let error) = focusResult {
         completion(.failure(error))
@@ -113,13 +91,24 @@ final class GhosttyInjector {
         completion(.success(()))
         return
       }
-      guard let keyStroke = self.keyStroke(for: command) else {
-        completion(.failure(InjectionError("Unsupported Ghostty command")))
+      if command == .newChat, target == .ghostty {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+          guard self.postKey(keyCode: 17, flags: .maskCommand) else {
+            completion(.failure(InjectionError("Could not create a new Ghostty tab")))
+            return
+          }
+          self.pasteAndSubmit("codex", to: target, delay: 0.6, completion: completion)
+        }
+        return
+      }
+      guard let keyStroke = self.keyStroke(for: command, target: target) else {
+        completion(.failure(InjectionError("Unsupported \(target.displayName) command")))
         return
       }
       DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
         guard self.postKey(keyCode: keyStroke.keyCode, flags: keyStroke.flags) else {
-          completion(.failure(InjectionError("Could not send the Ghostty keyboard command")))
+          completion(
+            .failure(InjectionError("Could not send the \(target.displayName) keyboard command")))
           return
         }
         completion(.success(()))
@@ -127,23 +116,23 @@ final class GhosttyInjector {
     }
   }
 
-  private func requestFocus(_ app: NSRunningApplication) throws {
+  private func requestFocus(_ app: NSRunningApplication, target: ApplicationTarget) throws {
     guard let bundleIdentifier = app.bundleIdentifier,
-      ghosttyBundleIdentifiers.contains(bundleIdentifier)
+      target.bundleIdentifiers.contains(bundleIdentifier)
     else {
-      throw InjectionError("The target is not a recognized Ghostty application")
+      throw InjectionError("The target is not a recognized \(target.displayName) application")
     }
 
     let source = "tell application id \"\(bundleIdentifier)\" to activate"
     guard let script = NSAppleScript(source: source) else {
-      throw InjectionError("Could not create the Ghostty activation request")
+      throw InjectionError("Could not create the \(target.displayName) activation request")
     }
     var errorInfo: NSDictionary?
     _ = script.executeAndReturnError(&errorInfo)
     if let errorInfo {
       let message =
         errorInfo[NSAppleScript.errorMessage] as? String
-        ?? "macOS rejected the Ghostty activation request"
+        ?? "macOS rejected the \(target.displayName) activation request"
       throw InjectionError(message)
     }
   }
@@ -170,37 +159,50 @@ final class GhosttyInjector {
     }
   }
 
-  private func resolveTarget(_ pid: pid_t?) -> NSRunningApplication? {
-    if let pid, let app = NSRunningApplication(processIdentifier: pid), !app.isTerminated {
+  private func resolveTarget(
+    _ target: ApplicationTarget, pid: pid_t?
+  ) -> NSRunningApplication? {
+    if let pid,
+      let app = NSRunningApplication(processIdentifier: pid),
+      !app.isTerminated,
+      isTarget(app, target: target)
+    {
       return app
     }
-    return NSWorkspace.shared.runningApplications.first(where: isGhostty)
+    return NSWorkspace.shared.runningApplications.first(where: {
+      isTarget($0, target: target)
+    })
   }
 
-  private func isGhostty(_ app: NSRunningApplication) -> Bool {
-    if let identifier = app.bundleIdentifier, ghosttyBundleIdentifiers.contains(identifier) {
+  private func isTarget(_ app: NSRunningApplication, target: ApplicationTarget) -> Bool {
+    if let identifier = app.bundleIdentifier, target.bundleIdentifiers.contains(identifier) {
       return true
     }
-    return app.localizedName?.lowercased() == "ghostty"
+    return app.localizedName?.lowercased() == target.displayName.lowercased()
   }
 
-  private func keyStroke(for command: GhosttyCommand) -> (
+  private func keyStroke(for command: ApplicationCommand, target: ApplicationTarget) -> (
     keyCode: CGKeyCode, flags: CGEventFlags
   )? {
     switch command {
     case .focus:
       return nil
-    case .newTab:
-      return (17, .maskCommand)
-    case .focusTab(let number):
+    case .newChat:
+      switch target {
+      case .ghostty: return nil
+      case .chatGPT: return (45, .maskCommand)
+      }
+    case .focusItem(let number):
       let keyCodes: [Int: CGKeyCode] = [
         1: 18, 2: 19, 3: 20, 4: 21, 5: 23, 6: 22, 7: 26, 8: 28, 9: 25,
       ]
       guard let keyCode = keyCodes[number] else { return nil }
       return (keyCode, .maskCommand)
-    case .nextTab:
+    case .nextItem:
+      guard target == .ghostty else { return nil }
       return (30, [.maskCommand, .maskShift])
-    case .previousTab:
+    case .previousItem:
+      guard target == .ghostty else { return nil }
       return (33, [.maskCommand, .maskShift])
     }
   }
@@ -217,6 +219,40 @@ final class GhosttyInjector {
     down.post(tap: .cgSessionEventTap)
     up.post(tap: .cgSessionEventTap)
     return true
+  }
+
+  private func pasteAndSubmit(
+    _ text: String,
+    to target: ApplicationTarget,
+    delay: TimeInterval,
+    completion: @escaping (Result<Void, Error>) -> Void
+  ) {
+    let pasteboard = NSPasteboard.general
+    let savedItems = copyPasteboardItems(pasteboard.pasteboardItems ?? [])
+    pasteboard.clearContents()
+    guard pasteboard.setString(text, forType: .string) else {
+      completion(.failure(InjectionError("Could not place text on the clipboard")))
+      return
+    }
+
+    DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+      guard self.postKey(keyCode: 9, flags: .maskCommand) else {
+        self.restorePasteboard(pasteboard, items: savedItems)
+        completion(.failure(InjectionError("Could not send Command-V to \(target.displayName)")))
+        return
+      }
+      DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+        guard self.postKey(keyCode: 36, flags: []) else {
+          self.restorePasteboard(pasteboard, items: savedItems)
+          completion(.failure(InjectionError("Could not send Return to \(target.displayName)")))
+          return
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.75) {
+          self.restorePasteboard(pasteboard, items: savedItems)
+        }
+        completion(.success(()))
+      }
+    }
   }
 
   private func copyPasteboardItems(_ items: [NSPasteboardItem]) -> [NSPasteboardItem] {

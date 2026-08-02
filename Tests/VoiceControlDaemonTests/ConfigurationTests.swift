@@ -3,6 +3,103 @@ import Testing
 
 @testable import VoiceControlDaemon
 
+@Test func decodesChatGPTAsActiveTarget() throws {
+  let configuration = try Configuration.decodeTOML(
+    Data(
+      """
+      target = "chatgpt"
+      """.utf8
+    )
+  )
+
+  #expect(configuration.target == .chatGPT)
+}
+
+@Test func onlyActiveTargetCommandsAreParsed() throws {
+  let configuration = try Configuration.decodeTOML(
+    Data(
+      """
+      target = "chatgpt"
+
+      [applications.ghostty.commands]
+      new_chat = ["open terminal chat"]
+      focus_1 = ["focus 1"]
+
+      [applications.chatgpt.commands]
+      new_chat = ["open app chat"]
+      focus_1 = ["focus 1"]
+      """.utf8
+    )
+  )
+
+  #expect(
+    ApplicationCommand.parse(
+      "open app chat",
+      wakePhrases: configuration.wakePhrases,
+      commands: configuration.activeCommands
+    ) == .newChat
+  )
+  #expect(
+    ApplicationCommand.parse(
+      "open terminal chat",
+      wakePhrases: configuration.wakePhrases,
+      commands: configuration.activeCommands
+    ) == nil
+  )
+  #expect(
+    ApplicationCommand.parse(
+      "focus 1",
+      wakePhrases: configuration.wakePhrases,
+      commands: configuration.activeCommands
+    ) == .focusItem(1)
+  )
+}
+
+@Test func rejectsCommandsOutsideAnApplicationHierarchy() {
+  let data = Data(
+    """
+    [commands]
+    new_chat = ["new chat"]
+    """.utf8
+  )
+
+  #expect(throws: ConfigurationError.self) {
+    try Configuration.decodeTOML(data)
+  }
+}
+
+@Test func speechContextOnlyIncludesTheActiveApplicationsCommands() throws {
+  let configuration = try Configuration.decodeTOML(
+    Data(
+      """
+      target = "chatgpt"
+
+      [applications.ghostty.commands]
+      focus = ["terminal only"]
+
+      [applications.chatgpt.commands]
+      focus = ["app only"]
+      """.utf8
+    )
+  )
+
+  #expect(configuration.contextualPhrases.contains("app only"))
+  #expect(!configuration.contextualPhrases.contains("terminal only"))
+}
+
+@Test func rejectsGhosttyOnlyNavigationCommandsForChatGPT() {
+  let data = Data(
+    """
+    [applications.chatgpt.commands]
+    next = ["focus next"]
+    """.utf8
+  )
+
+  #expect(throws: ConfigurationError.self) {
+    try Configuration.decodeTOML(data)
+  }
+}
+
 @Test func decodesCustomPhrasesAndTiming() throws {
   let configuration = try Configuration.decodeTOML(
     Data(
@@ -14,8 +111,8 @@ import Testing
       silence_threshold_db = -38
       maximum_recording_seconds = 120
 
-      [commands]
-      new_tab = ["make a tab"]
+      [applications.ghostty.commands]
+      new_chat = ["make a chat"]
       """.utf8
     )
   )
@@ -26,8 +123,8 @@ import Testing
   #expect(configuration.silenceSeconds == 6.5)
   #expect(configuration.silenceThresholdDB == -38)
   #expect(configuration.maximumRecordingSeconds == 120)
-  #expect(configuration.commands.newTab == ["make a tab"])
-  #expect(configuration.commands.nextTab == CommandPhrases.defaults.nextTab)
+  #expect(configuration.activeCommands.newChat == ["make a chat"])
+  #expect(configuration.activeCommands.next == CommandPhrases.ghosttyDefaults.next)
 }
 
 @Test func rejectsPhraseCollisionAcrossActions() throws {
@@ -50,18 +147,18 @@ import Testing
       """
       wake = ["computer"]
 
-      [commands]
-      new_tab = ["make a tab"]
+      [applications.ghostty.commands]
+      new_chat = ["make a chat"]
       """.utf8
     )
   )
 
   #expect(
-    GhosttyCommand.parse(
-      "Computer, make a tab",
+    ApplicationCommand.parse(
+      "Computer, make a chat",
       wakePhrases: configuration.wakePhrases,
-      commands: configuration.commands
-    ) == .newTab
+      commands: configuration.activeCommands
+    ) == .newChat
   )
 }
 

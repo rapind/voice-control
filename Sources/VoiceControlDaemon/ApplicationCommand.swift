@@ -1,17 +1,17 @@
 import Foundation
 
-enum GhosttyCommand: Equatable {
+enum ApplicationCommand: Equatable, Hashable {
   case focus
-  case newTab
-  case focusTab(Int)
-  case nextTab
-  case previousTab
+  case newChat
+  case focusItem(Int)
+  case nextItem
+  case previousItem
 
   static func parse(
     _ transcript: String,
     wakePhrases: [String],
     commands: CommandPhrases
-  ) -> GhosttyCommand? {
+  ) -> ApplicationCommand? {
     var normalized = PhraseMatcher.normalize(transcript)
     for phrase in wakePhrases.sorted(by: {
       PhraseMatcher.normalize($0).count > PhraseMatcher.normalize($1).count

@@ -1,0 +1,41 @@
+{
+  "originHash" : "339837fed5414b1f3f3cc15fa233e3771b720d2fd9c3ace6181ca4e3daee2100",
+  "pins" : [
+    {
+      "identity" : "fluidaudio",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/FluidInference/FluidAudio.git",
+      "state" : {
+        "revision" : "2ea0727541135c34189194084531337a3518e1bf"
+      }
+    },
+    {
+      "identity" : "swift-syntax",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/swiftlang/swift-syntax.git",
+      "state" : {
+        "revision" : "4799286537280063c85a32f09884cfbca301b1a1",
+        "version" : "602.0.0"
+      }
+    },
+    {
+      "identity" : "swift-testing",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/swiftlang/swift-testing.git",
+      "state" : {
+        "revision" : "48a471ab313e858258ab0b9b0bf2cea55a50cefb",
+        "version" : "6.2.3"
+      }
+    },
+    {
+      "identity" : "tomldecoder",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/dduan/TOMLDecoder.git",
+      "state" : {
+        "revision" : "a2bbd2796fe3064e107de18cb56031052c4fa899",
+        "version" : "0.4.5"
+      }
+    }
+  ],
+  "version" : 3
+}

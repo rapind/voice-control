@@ -37,29 +37,46 @@ The editable configuration lives at:
 ~/.config/voice-control/config.toml
 ```
 
-The app creates it with these defaults:
+The current Ghostty setup is:
 
 ```toml
+# Voice Control reloads this file automatically after you save it.
 target = "ghostty"
-wake = ["ghostee", "ghostty", "ghostie", "ghosty", "ghost tea"]
-submit = ["ghost it"]
-cancel = ["ghost cancel"]
+wake = ["hey now"]
+submit = ["send it now"]
+cancel = ["cancel now"]
 
 silence_seconds = 4
 silence_threshold_db = -42
 maximum_recording_seconds = 90
 
 [applications.ghostty.commands]
-focus = ["focus ghostty"]
+focus = ["focus now"]
 new_chat = ["new chat"]
 next = ["focus next"]
-previous = ["focus previous"]
+previous = ["focus previous", "focus prev"]
 focus_1 = ["focus 1"]
+focus_2 = ["focus 2"]
+focus_3 = ["focus 3"]
+focus_4 = ["focus 4"]
+focus_5 = ["focus 5"]
+focus_6 = ["focus 6"]
+focus_7 = ["focus 7"]
+focus_8 = ["focus 8"]
+focus_9 = ["focus 9"]
 
 [applications.chatgpt.commands]
 focus = ["focus chatgpt"]
 new_chat = ["new chat"]
 focus_1 = ["focus 1"]
+focus_2 = ["focus 2"]
+focus_3 = ["focus 3"]
+focus_4 = ["focus 4"]
+focus_5 = ["focus 5"]
+focus_6 = ["focus 6"]
+focus_7 = ["focus 7"]
+focus_8 = ["focus 8"]
+focus_9 = ["focus 9"]
 ```
 
 Set `target` to either `ghostty` or `chatgpt`. Save the file and the app applies valid changes within about one second. You do not need to rebuild or restart it. Invalid TOML leaves the last working configuration active and shows a config error in the menu.

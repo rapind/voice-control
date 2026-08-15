@@ -42,7 +42,7 @@ The current Ghostty setup is:
 ```toml
 # Voice Control reloads this file automatically after you save it.
 target = "ghostty"
-wake = ["pewter", "pooter", "pyewter"]
+wake = ["pewter", "pooter", "pyewter", "computer"]
 submit = ["send it", "sent it"]
 cancel = ["cancel it"]
 

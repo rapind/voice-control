@@ -1,5 +1,23 @@
 import Foundation
 
+struct KeywordTranscript: Equatable {
+  struct Segment: Equatable {
+    let text: String
+    let timestamp: TimeInterval
+    let duration: TimeInterval
+  }
+
+  let text: String
+  let segments: [Segment]
+}
+
+struct ControlPhraseMatch: Equatable {
+  let phrase: String
+  let startTime: TimeInterval
+  let endTime: TimeInterval
+  let transcriptEndTime: TimeInterval
+}
+
 enum PhraseMatcher {
   static func normalize(_ text: String) -> String {
     text.lowercased()
@@ -27,6 +45,71 @@ enum PhraseMatcher {
 
   static func contains(any phrases: [String], in text: String) -> Bool {
     phrases.contains { contains($0, in: text) }
+  }
+
+  static func trailingMatch(
+    any phrases: [String],
+    in transcript: KeywordTranscript,
+    maximumTrailingWords: Int
+  ) -> ControlPhraseMatch? {
+    struct TimedWord {
+      let text: String
+      let timestamp: TimeInterval
+      let duration: TimeInterval
+    }
+
+    guard maximumTrailingWords >= 0 else { return nil }
+    let transcriptEndTime =
+      transcript.segments.map { $0.timestamp + $0.duration }.max() ?? 0
+    let words = transcript.segments.flatMap { segment in
+      normalize(segment.text).split(separator: " ").map {
+        TimedWord(
+          text: String($0),
+          timestamp: segment.timestamp,
+          duration: segment.duration
+        )
+      }
+    }
+    var best: (startIndex: Int, wordCount: Int, match: ControlPhraseMatch)?
+
+    for phrase in phrases {
+      let phraseWords = normalize(phrase).split(separator: " ").map(String.init)
+      guard !phraseWords.isEmpty, phraseWords.count <= words.count else { continue }
+
+      for startIndex in stride(
+        from: words.count - phraseWords.count,
+        through: 0,
+        by: -1
+      ) {
+        let endIndex = startIndex + phraseWords.count
+        guard words.count - endIndex <= maximumTrailingWords else { continue }
+        guard
+          zip(words[startIndex..<endIndex], phraseWords).allSatisfy({
+            $0.text == $1
+          })
+        else {
+          continue
+        }
+
+        let first = words[startIndex]
+        let last = words[endIndex - 1]
+        let match = ControlPhraseMatch(
+          phrase: phrase,
+          startTime: first.timestamp,
+          endTime: last.timestamp + last.duration,
+          transcriptEndTime: transcriptEndTime
+        )
+        if best == nil
+          || startIndex > best!.startIndex
+          || (startIndex == best!.startIndex && phraseWords.count > best!.wordCount)
+        {
+          best = (startIndex, phraseWords.count, match)
+        }
+        break
+      }
+    }
+
+    return best?.match
   }
 
   private static func canonicalizeCodex(in text: String) -> String {
@@ -84,7 +167,7 @@ enum PhraseMatcher {
 
   private static func strip(phrase: String, fromEndOf text: String) -> String {
     let escaped = NSRegularExpression.escapedPattern(for: phrase)
-    let pattern = "[\\s,.:;!?-]*\\b\(escaped)[\\s,.:;!?-]*$"
+    let pattern = "\\s*\\b\(escaped)[\\s,.:;!?-]*$"
     return replace(pattern: pattern, in: text)
   }
 

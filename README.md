@@ -2,7 +2,7 @@
 
 This is throwaway code answering one question: can one small macOS process reliably own the complete voice transaction without wrapping Codex or interfering with the target application's rendering?
 
-The daemon listens for a wake phrase, focuses the configured application, records until a submit phrase or silence, transcribes locally with Parakeet, strips the submit phrase, pastes the prompt, and presses Return.
+The daemon listens for a wake phrase, focuses the configured application, shows a live local Parakeet transcription while recording, and replaces that preview with a final full-context transcript before pressing Return.
 
 ## Before running
 
@@ -42,16 +42,16 @@ The current Ghostty setup is:
 ```toml
 # Voice Control reloads this file automatically after you save it.
 target = "ghostty"
-wake = ["hey now"]
-submit = ["send it now"]
-cancel = ["cancel now"]
+wake = ["pewter", "pooter", "pyewter"]
+submit = ["send it", "sent it"]
+cancel = ["cancel it"]
 
 silence_seconds = 4
 silence_threshold_db = -42
 maximum_recording_seconds = 90
 
 [applications.ghostty.commands]
-focus = ["focus now"]
+focus = ["focus term"]
 new_chat = ["new chat"]
 next = ["focus next"]
 previous = ["focus previous", "focus prev"]
@@ -105,14 +105,15 @@ Both targets support:
 
 For Ghostty, `new chat` opens a new tab, types `codex`, and presses Return. Ghostty also supports `focus next` and `focus previous`. For ChatGPT, `new chat` sends Command-N. Numbered focus commands send Command-1 through Command-9 to the selected application.
 
-All other speech remains a normal Codex prompt and is transcribed by Parakeet after a configured submit phrase or the silence timeout.
+All other speech remains a normal prompt. While recording, rolling full-context Parakeet passes revise the visible text in place. After a configured submit phrase or the silence timeout, the preview is cleared and replaced with the final Parakeet transcript before Return is sent.
 
-Say a configured cancel phrase while recording to discard the prompt and return to wake listening. Nothing is transcribed, pasted, or submitted.
+The configured submit phrase creates an audio cutoff. The phrase itself and anything spoken after it are excluded from final transcription. Say a configured cancel phrase to clear the live preview, discard the recording, and return to wake listening without submitting.
 
 ## Prototype limits
 
 - It targets the selected application's frontmost process when the wake phrase is detected. If another app is frontmost, it falls back to the selected running application.
-- The submit phrase is recognized by Apple Speech but the final prompt is transcribed by Parakeet. A badly mis-transcribed submit phrase can remain at the end of the prompt.
+- Live preview updates run about every 1.5 seconds and may revise earlier words. The final full-context Parakeet pass remains authoritative.
+- Live preview typing stops rather than sending text to an application that is no longer frontmost.
 - Model downloading and Hugging Face authentication are deliberately out of scope. The prototype fails clearly when the shared cached model is missing.
 - Silence detection uses a configurable RMS threshold, not a neural VAD.
 - The app is ad-hoc signed with a stable identifier-only designated requirement. This avoids a paid Apple developer account and should preserve Accessibility approval across local rebuilds. It is appropriate for this private local tool, but weaker than certificate-backed signing because another local app using the same bundle identifier could satisfy the requirement.

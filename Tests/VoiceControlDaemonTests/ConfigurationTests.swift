@@ -1,3 +1,4 @@
+import AVFoundation
 import Foundation
 import Testing
 
@@ -170,6 +171,153 @@ import Testing
       submitPhrases: ["do it", "ship it"]
     ) == "write the test"
   )
+}
+
+@Test func preservesPunctuationBeforeConfiguredSubmitPhrase() {
+  #expect(
+    PhraseMatcher.cleanFinalTranscript(
+      "Here is a short prompt. Send it.",
+      wakePhrases: ["pewter"],
+      submitPhrases: ["send it", "sent it"]
+    ) == "Here is a short prompt."
+  )
+}
+
+@Test func matchesConfiguredControlPhraseNearTranscriptTail() {
+  let transcript = KeywordTranscript(
+    text: "write this send it accidental trailing",
+    segments: [
+      .init(text: "write", timestamp: 0, duration: 0.4),
+      .init(text: "this", timestamp: 0.4, duration: 0.4),
+      .init(text: "send", timestamp: 0.8, duration: 0.4),
+      .init(text: "it", timestamp: 1.2, duration: 0.3),
+      .init(text: "accidental", timestamp: 1.5, duration: 0.5),
+      .init(text: "trailing", timestamp: 2.0, duration: 0.5),
+    ]
+  )
+
+  let match = PhraseMatcher.trailingMatch(
+    any: ["ship it", "send it"],
+    in: transcript,
+    maximumTrailingWords: 3
+  )
+
+  #expect(match?.phrase == "send it")
+  #expect(match?.startTime == 0.8)
+  #expect(match?.endTime == 1.5)
+  #expect(match?.transcriptEndTime == 2.5)
+  #expect(match.map { $0.transcriptEndTime - $0.endTime } == 1.0)
+}
+
+@Test func ignoresConfiguredControlPhraseOutsideTrailingWindow() {
+  let transcript = KeywordTranscript(
+    text: "send it as ordinary dictated content here",
+    segments: [
+      .init(text: "send", timestamp: 0, duration: 0.3),
+      .init(text: "it", timestamp: 0.3, duration: 0.2),
+      .init(text: "as", timestamp: 0.5, duration: 0.2),
+      .init(text: "ordinary", timestamp: 0.7, duration: 0.4),
+      .init(text: "dictated", timestamp: 1.1, duration: 0.4),
+      .init(text: "content", timestamp: 1.5, duration: 0.3),
+      .init(text: "here", timestamp: 1.8, duration: 0.3),
+    ]
+  )
+
+  #expect(
+    PhraseMatcher.trailingMatch(
+      any: ["send it"],
+      in: transcript,
+      maximumTrailingWords: 3
+    ) == nil
+  )
+}
+
+@Test func calculatesRecordingCutoffFramesFromTranscriptTail() {
+  #expect(
+    RecordingCutoff.frameCount(
+      secondsToRemoveFromEnd: 1.25,
+      sampleRate: 16_000,
+      availableFrames: 40_000
+    ) == 20_000
+  )
+  #expect(
+    RecordingCutoff.frameCount(
+      secondsToRemoveFromEnd: -1,
+      sampleRate: 16_000,
+      availableFrames: 40_000
+    ) == 40_000
+  )
+  #expect(
+    RecordingCutoff.frameCount(
+      secondsToRemoveFromEnd: 10,
+      sampleRate: 16_000,
+      availableFrames: 40_000
+    ) == 0
+  )
+}
+
+@Test func trimsRecordedAudioAtSubmitTimestamp() throws {
+  let directory = FileManager.default.temporaryDirectory
+    .appendingPathComponent(UUID().uuidString, isDirectory: true)
+  try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+  defer { try? FileManager.default.removeItem(at: directory) }
+  let sourceURL = directory.appendingPathComponent("prompt.wav")
+  let format = AVAudioFormat(standardFormatWithSampleRate: 48_000, channels: 1)!
+  let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: 48_000)!
+  buffer.frameLength = 48_000
+  memset(buffer.floatChannelData![0], 0, Int(buffer.frameLength) * MemoryLayout<Float>.size)
+  do {
+    let file = try AVAudioFile(forWriting: sourceURL, settings: format.settings)
+    try file.write(from: buffer)
+  }
+
+  let trimmedURL = try RecordingTrimmer.trim(
+    sourceURL,
+    secondsToRemoveFromEnd: 0.5
+  )
+
+  let trimmed = try AVAudioFile(forReading: trimmedURL)
+  #expect(trimmed.length == 24_000)
+}
+
+@Test func reconcilesRevisedPartialTranscriptFromCommonPrefix() {
+  var preview = TranscriptPreview()
+
+  #expect(
+    preview.replace(with: "open the red tab")
+      == PreviewEdit(deleteCount: 0, insertion: "open the red tab")
+  )
+  #expect(
+    preview.replace(with: "open the read tab")
+      == PreviewEdit(deleteCount: 5, insertion: "ad tab")
+  )
+  #expect(preview.text == "open the read tab")
+}
+
+@Test func replacesLivePreviewWithFinalTranscript() {
+  var preview = TranscriptPreview()
+  _ = preview.replace(with: "draft trans script")
+
+  let edit = preview.replace(with: "draft transcript")
+
+  #expect(edit == PreviewEdit(deleteCount: 7, insertion: "cript"))
+  #expect(preview.text == "draft transcript")
+}
+
+@Test func clearsEntireLivePreviewWhenRecordingIsCancelled() {
+  var preview = TranscriptPreview()
+  _ = preview.replace(with: "do not submit this")
+
+  let edit = preview.replace(with: "")
+
+  #expect(edit == PreviewEdit(deleteCount: 18, insertion: ""))
+  #expect(preview.text.isEmpty)
+}
+
+@Test func waitsLongerBeforeSubmittingLargerPastes() {
+  #expect(SubmissionTiming.returnDelay(for: String(repeating: "a", count: 50)) == 0.75)
+  #expect(SubmissionTiming.returnDelay(for: String(repeating: "a", count: 300)) == 2.0)
+  #expect(SubmissionTiming.returnDelay(for: String(repeating: "a", count: 1_000)) == 3.0)
 }
 
 @Test func reloadsChangedFileAndKeepsLastGoodConfigurationAfterAnError() throws {

@@ -59,10 +59,45 @@ final class ApplicationController {
     }
   }
 
-  func inject(
-    _ text: String,
-    into target: ApplicationTarget,
-    targetPID: pid_t?, completion: @escaping (Result<Void, Error>) -> Void
+  func applyPreviewEdit(
+    _ edit: PreviewEdit,
+    to target: ApplicationTarget,
+    targetPID: pid_t?
+  ) -> Result<Void, Error> {
+    guard AXIsProcessTrusted() else {
+      return .failure(InjectionError("Accessibility permission is not granted"))
+    }
+    guard let targetPID,
+      let app = NSRunningApplication(processIdentifier: targetPID),
+      !app.isTerminated,
+      isTarget(app, target: target)
+    else {
+      return .failure(InjectionError("The captured \(target.displayName) target is unavailable"))
+    }
+    guard NSWorkspace.shared.frontmostApplication?.processIdentifier == targetPID else {
+      return .failure(
+        InjectionError(
+          "\(target.displayName) is no longer frontmost; live transcription was not typed"
+        ))
+    }
+
+    for _ in 0..<edit.deleteCount {
+      guard postKey(keyCode: 51, flags: []) else {
+        return .failure(InjectionError("Could not revise the live transcription"))
+      }
+    }
+    guard edit.insertion.isEmpty || postText(edit.insertion) else {
+      return .failure(InjectionError("Could not type the live transcription"))
+    }
+    return .success(())
+  }
+
+  func submitPreview(
+    _ edit: PreviewEdit,
+    finalText: String,
+    to target: ApplicationTarget,
+    targetPID: pid_t?,
+    completion: @escaping (Result<Void, Error>) -> Void
   ) {
     focus(target, targetPID: targetPID) { [weak self] focusResult in
       guard let self else { return }
@@ -70,8 +105,24 @@ final class ApplicationController {
         completion(.failure(error))
         return
       }
-
-      self.pasteAndSubmit(text, to: target, delay: 0.15, completion: completion)
+      if case .failure(let error) = self.applyPreviewEdit(
+        edit,
+        to: target,
+        targetPID: targetPID
+      ) {
+        completion(.failure(error))
+        return
+      }
+      DispatchQueue.main.asyncAfter(
+        deadline: .now() + SubmissionTiming.returnDelay(for: finalText)
+      ) {
+        do {
+          try self.pressReturnUsingSystemEvents()
+          completion(.success(()))
+        } catch {
+          completion(.failure(error))
+        }
+      }
     }
   }
 
@@ -97,7 +148,12 @@ final class ApplicationController {
             completion(.failure(InjectionError("Could not create a new Ghostty tab")))
             return
           }
-          self.pasteAndSubmit("codex", to: target, delay: 0.6, completion: completion)
+          self.pasteAndSubmit(
+            "codex",
+            to: target,
+            delay: 0.6,
+            completion: completion
+          )
         }
         return
       }
@@ -221,6 +277,41 @@ final class ApplicationController {
     return true
   }
 
+  private func pressReturnUsingSystemEvents() throws {
+    guard
+      let script = NSAppleScript(
+        source: "tell application id \"com.apple.systemevents\" to key code 36"
+      )
+    else {
+      throw InjectionError("Could not create the Return key request")
+    }
+    var errorInfo: NSDictionary?
+    _ = script.executeAndReturnError(&errorInfo)
+    if let errorInfo {
+      let message =
+        errorInfo[NSAppleScript.errorMessage] as? String
+        ?? "macOS rejected the Return key request"
+      throw InjectionError(message)
+    }
+  }
+
+  private func postText(_ text: String) -> Bool {
+    guard let source = CGEventSource(stateID: .hidSystemState),
+      let down = CGEvent(keyboardEventSource: source, virtualKey: 0, keyDown: true),
+      let up = CGEvent(keyboardEventSource: source, virtualKey: 0, keyDown: false)
+    else {
+      return false
+    }
+    var characters = Array(text.utf16)
+    down.keyboardSetUnicodeString(
+      stringLength: characters.count,
+      unicodeString: &characters
+    )
+    down.post(tap: .cgSessionEventTap)
+    up.post(tap: .cgSessionEventTap)
+    return true
+  }
+
   private func pasteAndSubmit(
     _ text: String,
     to target: ApplicationTarget,
@@ -241,10 +332,14 @@ final class ApplicationController {
         completion(.failure(InjectionError("Could not send Command-V to \(target.displayName)")))
         return
       }
-      DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
-        guard self.postKey(keyCode: 36, flags: []) else {
+      DispatchQueue.main.asyncAfter(
+        deadline: .now() + SubmissionTiming.returnDelay(for: text)
+      ) {
+        do {
+          try self.pressReturnUsingSystemEvents()
+        } catch {
           self.restorePasteboard(pasteboard, items: savedItems)
-          completion(.failure(InjectionError("Could not send Return to \(target.displayName)")))
+          completion(.failure(error))
           return
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.75) {
@@ -272,6 +367,40 @@ final class ApplicationController {
     if !items.isEmpty {
       pasteboard.writeObjects(items)
     }
+  }
+}
+
+enum SubmissionTiming {
+  static func returnDelay(for text: String) -> TimeInterval {
+    min(3, max(0.75, 0.5 + Double(text.utf16.count) / 200))
+  }
+}
+
+struct PreviewEdit: Equatable {
+  let deleteCount: Int
+  let insertion: String
+}
+
+struct TranscriptPreview {
+  private(set) var text = ""
+
+  mutating func replace(with replacement: String) -> PreviewEdit {
+    var previousIndex = text.startIndex
+    var replacementIndex = replacement.startIndex
+    while previousIndex < text.endIndex,
+      replacementIndex < replacement.endIndex,
+      text[previousIndex] == replacement[replacementIndex]
+    {
+      text.formIndex(after: &previousIndex)
+      replacement.formIndex(after: &replacementIndex)
+    }
+
+    let edit = PreviewEdit(
+      deleteCount: text[previousIndex...].count,
+      insertion: String(replacement[replacementIndex...])
+    )
+    text = replacement
+    return edit
   }
 }
 

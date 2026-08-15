@@ -4,7 +4,7 @@ import OSLog
 import Speech
 
 final class KeywordListener {
-  var onTranscript: ((String) -> Void)?
+  var onTranscript: ((KeywordTranscript) -> Void)?
   var onError: ((String) -> Void)?
 
   private let recognizer = SFSpeechRecognizer(locale: Locale(identifier: "en-US"))
@@ -17,6 +17,7 @@ final class KeywordListener {
   private var request: SFSpeechAudioBufferRecognitionRequest?
   private var task: SFSpeechRecognitionTask?
   private var recycleTimer: Timer?
+  private var requestStartAudioTime: TimeInterval?
   private var generation = 0
   private(set) var isListening = false
 
@@ -48,6 +49,7 @@ final class KeywordListener {
 
     lock.lock()
     self.request = request
+    requestStartAudioTime = nil
     lock.unlock()
     isListening = true
     generation += 1
@@ -58,8 +60,22 @@ final class KeywordListener {
       DispatchQueue.main.async {
         guard self.isListening, self.generation == currentGeneration else { return }
         if let result {
-          let transcript = result.bestTranscription.formattedString
-          self.onTranscript?(transcript)
+          let transcription = result.bestTranscription
+          self.lock.lock()
+          let timelineOffset = self.requestStartAudioTime ?? 0
+          self.lock.unlock()
+          self.onTranscript?(
+            KeywordTranscript(
+              text: transcription.formattedString,
+              segments: transcription.segments.map {
+                KeywordTranscript.Segment(
+                  text: $0.substring,
+                  timestamp: timelineOffset + $0.timestamp,
+                  duration: $0.duration
+                )
+              }
+            )
+          )
         }
         if let error {
           let nsError = error as NSError
@@ -115,14 +131,18 @@ final class KeywordListener {
     lock.lock()
     request?.endAudio()
     request = nil
+    requestStartAudioTime = nil
     lock.unlock()
     task?.cancel()
     task = nil
   }
 
-  func append(_ buffer: AVAudioPCMBuffer) {
+  func append(_ buffer: AVAudioPCMBuffer, startingAt audioTime: TimeInterval) {
     lock.lock()
     let currentRequest = request
+    if currentRequest != nil, requestStartAudioTime == nil {
+      requestStartAudioTime = audioTime
+    }
     lock.unlock()
     currentRequest?.append(buffer)
   }

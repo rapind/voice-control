@@ -11,23 +11,32 @@ final class VoiceController {
   private let keywords: KeywordListener
   private let applicationController = ApplicationController()
   private let transcriber = ParakeetTranscriber()
+  private let liveAudioRouter = LiveAudioBufferRouter()
   private var machine = VoiceStateMachine()
   private var modelReady = false
   private var voiceReady = false
   private var targetPID: pid_t?
   private var lastSpeechAt = Date()
   private var recordingStartedAt = Date()
+  private var submitTailDuration: TimeInterval?
   private var ignoreSilenceUntil = Date()
   private var heardPromptSpeech = false
   private var silenceTimer: Timer?
   private var lastKeywordTranscript = ""
+  private var preview = TranscriptPreview()
+  private var pendingPreviewText = ""
+  private var previewReady = false
 
   init(configuration: Configuration) {
     self.configuration = configuration
     self.keywords = KeywordListener(contextualStrings: configuration.contextualPhrases)
 
-    audio.onBuffer = { [weak self] buffer in
-      self?.keywords.append(buffer)
+    audio.onBuffer = { [weak self] buffer, startTime in
+      self?.keywords.append(buffer, startingAt: startTime)
+    }
+    let liveAudioRouter = self.liveAudioRouter
+    audio.onRecordingBuffer = { buffer in
+      liveAudioRouter.appendCopy(of: buffer)
     }
     audio.onLevel = { [weak self] db in
       guard db >= (self?.configuration.silenceThresholdDB ?? -42) else { return }
@@ -70,6 +79,7 @@ final class VoiceController {
     silenceTimer?.invalidate()
     silenceTimer = nil
     keywords.stop()
+    stopLiveTranscription()
     audio.stop()
   }
 
@@ -147,6 +157,13 @@ final class VoiceController {
       recordingStartedAt = Date()
       ignoreSilenceUntil = Date().addingTimeInterval(0.6)
       lastSpeechAt = ignoreSilenceUntil
+      submitTailDuration = nil
+      preview = TranscriptPreview()
+      pendingPreviewText = ""
+      previewReady = false
+      let liveInput = LiveAudioBufferSink()
+      liveAudioRouter.route(to: liveInput)
+      startLiveTranscription(input: liveInput)
       do {
         try audio.beginRecording()
         NSSound(named: "Tink")?.play()
@@ -155,7 +172,11 @@ final class VoiceController {
           [weak self] result in
           DispatchQueue.main.async {
             guard let self, self.machine.phase == .recording else { return }
-            if case .failure(let error) = result {
+            switch result {
+            case .success:
+              self.previewReady = true
+              self.applyPendingPreview()
+            case .failure(let error):
               self.fail(error.localizedDescription)
             }
           }
@@ -169,7 +190,20 @@ final class VoiceController {
       silenceTimer = nil
       keywords.stop()
       NSSound(named: "Pop")?.play()
-      guard let fileURL = audio.finishRecording() else {
+      liveAudioRouter.finish()
+      let fileURL: URL?
+      do {
+        if let submitTailDuration {
+          fileURL = try audio.finishRecording(removingTailOf: submitTailDuration)
+        } else {
+          fileURL = audio.finishRecording()
+        }
+      } catch {
+        fail("Could not trim the submit command from the recording: \(error.localizedDescription)")
+        return
+      }
+      self.submitTailDuration = nil
+      guard let fileURL else {
         fail("No prompt recording was available")
         return
       }
@@ -179,7 +213,11 @@ final class VoiceController {
       silenceTimer?.invalidate()
       silenceTimer = nil
       keywords.stop()
+      stopLiveTranscription()
       discardPromptRecording()
+      if case .failure(let error) = clearLivePreview() {
+        print("ERROR: Could not clear cancelled live transcription: \(error.localizedDescription)")
+      }
       NSSound(named: "Pop")?.play()
 
     case .inject(let text):
@@ -188,10 +226,18 @@ final class VoiceController {
         wakePhrases: configuration.wakePhrases,
         commands: configuration.activeCommands
       ) {
+        if case .failure(let error) = clearLivePreview() {
+          fail(error.localizedDescription)
+          return
+        }
         execute(command)
       } else {
-        applicationController.inject(
-          text, into: configuration.target, targetPID: targetPID
+        let edit = preview.replace(with: text)
+        applicationController.submitPreview(
+          edit,
+          finalText: text,
+          to: configuration.target,
+          targetPID: targetPID
         ) { [weak self] result in
           self?.completeApplicationOperation(result)
         }
@@ -201,8 +247,13 @@ final class VoiceController {
       silenceTimer?.invalidate()
       silenceTimer = nil
       keywords.stop()
+      stopLiveTranscription()
       discardPromptRecording()
       NSSound(named: "Pop")?.play()
+      if case .failure(let error) = clearLivePreview() {
+        fail(error.localizedDescription)
+        return
+      }
       execute(command)
 
     case .reportError(let message):
@@ -211,26 +262,35 @@ final class VoiceController {
     }
   }
 
-  private func handleKeywordTranscript(_ transcript: String) {
-    let normalized = PhraseMatcher.normalize(transcript)
+  private func handleKeywordTranscript(_ transcript: KeywordTranscript) {
+    let normalized = PhraseMatcher.normalize(transcript.text)
     guard normalized != lastKeywordTranscript else { return }
     lastKeywordTranscript = normalized
 
     switch machine.phase {
     case .waitingForWake:
-      if PhraseMatcher.contains(any: configuration.wakePhrases, in: transcript) {
+      if PhraseMatcher.contains(any: configuration.wakePhrases, in: transcript.text) {
         print("Wake phrase detected")
         dispatch(.wakeDetected)
       }
     case .recording:
-      if PhraseMatcher.contains(any: configuration.cancelPhrases, in: transcript) {
+      if PhraseMatcher.trailingMatch(
+        any: configuration.cancelPhrases,
+        in: transcript,
+        maximumTrailingWords: 6
+      ) != nil {
         print("Cancel phrase detected")
         dispatch(.cancelDetected)
-      } else if PhraseMatcher.contains(any: configuration.submitPhrases, in: transcript) {
+      } else if let match = PhraseMatcher.trailingMatch(
+        any: configuration.submitPhrases,
+        in: transcript,
+        maximumTrailingWords: 6
+      ) {
+        submitTailDuration = max(0, match.transcriptEndTime - match.endTime)
         print("Submit phrase detected")
         dispatch(.submitDetected)
       } else if let command = ApplicationCommand.parse(
-        transcript,
+        transcript.text,
         wakePhrases: configuration.wakePhrases,
         commands: configuration.activeCommands
       ) {
@@ -240,6 +300,77 @@ final class VoiceController {
     default:
       break
     }
+  }
+
+  private func startLiveTranscription(input: LiveAudioBufferSink) {
+    Task { @MainActor [weak self] in
+      guard let self else { return }
+      do {
+        try await transcriber.startLiveTranscription(
+          input: input,
+          onUpdate: { [weak self] text in
+            self?.handleLiveTranscript(text)
+          },
+          onError: { [weak self] message in
+            guard let self, self.machine.phase == .recording else { return }
+            self.fail("Live Parakeet transcription failed: \(message)")
+          }
+        )
+      } catch {
+        guard machine.phase == .recording else { return }
+        fail("Could not start live Parakeet transcription: \(error.localizedDescription)")
+      }
+    }
+  }
+
+  private func stopLiveTranscription() {
+    liveAudioRouter.finish()
+    Task {
+      await transcriber.stopLiveTranscription()
+    }
+  }
+
+  private func handleLiveTranscript(_ text: String) {
+    guard machine.phase == .recording else { return }
+    pendingPreviewText = text.trimmingCharacters(in: .whitespacesAndNewlines)
+    applyPendingPreview()
+  }
+
+  private func applyPendingPreview() {
+    guard machine.phase == .recording, previewReady else { return }
+    var nextPreview = preview
+    let edit = nextPreview.replace(with: pendingPreviewText)
+    guard edit.deleteCount > 0 || !edit.insertion.isEmpty else { return }
+    switch applicationController.applyPreviewEdit(
+      edit,
+      to: configuration.target,
+      targetPID: targetPID
+    ) {
+    case .success:
+      preview = nextPreview
+    case .failure(let error):
+      fail(error.localizedDescription)
+    }
+  }
+
+  private func clearLivePreview() -> Result<Void, Error> {
+    pendingPreviewText = ""
+    guard previewReady else {
+      preview = TranscriptPreview()
+      return .success(())
+    }
+    var emptyPreview = preview
+    let edit = emptyPreview.replace(with: "")
+    guard edit.deleteCount > 0 || !edit.insertion.isEmpty else { return .success(()) }
+    let result = applicationController.applyPreviewEdit(
+      edit,
+      to: configuration.target,
+      targetPID: targetPID
+    )
+    if case .success = result {
+      preview = emptyPreview
+    }
+    return result
   }
 
   private func startSilenceTimer() {
@@ -337,6 +468,7 @@ final class VoiceController {
     silenceTimer?.invalidate()
     silenceTimer = nil
     keywords.stop()
+    stopLiveTranscription()
     _ = audio.finishRecording()
     dispatch(.failed(message))
     guard recover else { return }

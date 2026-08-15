@@ -1,8 +1,14 @@
+@preconcurrency import AVFoundation
 import FluidAudio
 import Foundation
 
 actor ParakeetTranscriber {
   private var manager: AsrManager?
+  private var models: AsrModels?
+  private var liveManager: AsrManager?
+  private var liveInput: LiveAudioBufferSink?
+  private var liveInputTask: Task<Void, Never>?
+  private var liveGeneration = 0
 
   func prepare() async throws {
     let cacheDirectory = AsrModels.defaultCacheDirectory(for: .v3)
@@ -19,10 +25,81 @@ actor ParakeetTranscriber {
     )
     let manager = AsrManager(config: .default)
     try await manager.loadModels(models)
+    self.models = models
     self.manager = manager
   }
 
+  func startLiveTranscription(
+    input: LiveAudioBufferSink,
+    onUpdate: @escaping @MainActor @Sendable (String) -> Void,
+    onError: @escaping @MainActor @Sendable (String) -> Void
+  ) async throws {
+    await stopLiveTranscription()
+    let generation = liveGeneration
+    guard let models else {
+      throw ParakeetError("Parakeet is not loaded")
+    }
+
+    let liveManager = AsrManager(config: .default)
+    try await liveManager.loadModels(models)
+    guard generation == liveGeneration else {
+      await liveManager.cleanup()
+      return
+    }
+
+    self.liveManager = liveManager
+    liveInput = input
+    liveInputTask = Task {
+      let converter = AudioConverter()
+      var samples: [Float] = []
+      samples.reserveCapacity(16_000 * 30)
+      let updateIntervalSamples = 24_000
+      var nextUpdateSampleCount = updateIntervalSamples
+      let decoderLayerCount = await liveManager.decoderLayerCount
+
+      do {
+        for await buffer in input.stream {
+          try Task.checkCancellation()
+          samples.append(contentsOf: try converter.resampleBuffer(buffer))
+          guard samples.count >= nextUpdateSampleCount else { continue }
+          nextUpdateSampleCount = samples.count + updateIntervalSamples
+
+          var decoderState = TdtDecoderState.make(decoderLayers: decoderLayerCount)
+          let result = try await liveManager.transcribe(
+            samples,
+            decoderState: &decoderState,
+            language: .english
+          )
+          try Task.checkCancellation()
+          guard generation == self.liveGeneration else { return }
+          await onUpdate(result.text)
+        }
+      } catch is CancellationError {
+        return
+      } catch {
+        guard !Task.isCancelled, generation == self.liveGeneration else { return }
+        await onError(error.localizedDescription)
+      }
+    }
+  }
+
+  func stopLiveTranscription() async {
+    liveGeneration += 1
+    let input = liveInput
+    let inputTask = liveInputTask
+    let liveManager = liveManager
+    liveInput = nil
+    liveInputTask = nil
+    self.liveManager = nil
+
+    input?.finish()
+    inputTask?.cancel()
+    await inputTask?.value
+    await liveManager?.cleanup()
+  }
+
   func transcribe(fileURL: URL) async throws -> String {
+    await stopLiveTranscription()
     guard let manager else {
       throw ParakeetError("Parakeet is not loaded")
     }
@@ -36,6 +113,94 @@ actor ParakeetTranscriber {
       language: .english
     )
     return result.text
+  }
+}
+
+final class LiveAudioBufferRouter: @unchecked Sendable {
+  private let lock = NSLock()
+  private var sink: LiveAudioBufferSink?
+
+  func route(to sink: LiveAudioBufferSink) {
+    lock.lock()
+    let previous = self.sink
+    self.sink = sink
+    lock.unlock()
+    previous?.finish()
+  }
+
+  func appendCopy(of buffer: AVAudioPCMBuffer) {
+    lock.lock()
+    let sink = sink
+    lock.unlock()
+    sink?.appendCopy(of: buffer)
+  }
+
+  func finish() {
+    lock.lock()
+    let sink = sink
+    self.sink = nil
+    lock.unlock()
+    sink?.finish()
+  }
+}
+
+final class LiveAudioBufferSink: @unchecked Sendable {
+  let stream: AsyncStream<AVAudioPCMBuffer>
+
+  private let lock = NSLock()
+  private var continuation: AsyncStream<AVAudioPCMBuffer>.Continuation?
+
+  init() {
+    let pair = AsyncStream.makeStream(
+      of: AVAudioPCMBuffer.self,
+      bufferingPolicy: .unbounded
+    )
+    stream = pair.stream
+    continuation = pair.continuation
+  }
+
+  func appendCopy(of buffer: AVAudioPCMBuffer) {
+    lock.lock()
+    let continuation = continuation
+    lock.unlock()
+    guard let continuation, let copy = buffer.streamingCopy() else { return }
+    continuation.yield(copy)
+  }
+
+  func finish() {
+    lock.lock()
+    let continuation = continuation
+    self.continuation = nil
+    lock.unlock()
+    continuation?.finish()
+  }
+}
+
+extension AVAudioPCMBuffer {
+  fileprivate func streamingCopy() -> AVAudioPCMBuffer? {
+    guard
+      let copy = AVAudioPCMBuffer(
+        pcmFormat: format,
+        frameCapacity: frameLength
+      )
+    else {
+      return nil
+    }
+    copy.frameLength = frameLength
+
+    let sourceBuffers = UnsafeMutableAudioBufferListPointer(mutableAudioBufferList)
+    let destinationBuffers = UnsafeMutableAudioBufferListPointer(copy.mutableAudioBufferList)
+    guard sourceBuffers.count == destinationBuffers.count else { return nil }
+    for index in sourceBuffers.indices {
+      let source = sourceBuffers[index]
+      guard let sourceData = source.mData, let destinationData = destinationBuffers[index].mData
+      else {
+        return nil
+      }
+      memcpy(destinationData, sourceData, Int(source.mDataByteSize))
+      destinationBuffers[index].mDataByteSize = source.mDataByteSize
+    }
+    return copy
   }
 }
 

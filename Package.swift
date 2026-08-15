@@ -21,6 +21,10 @@ let package = Package(
       ],
       path: "Sources/VoiceControlDaemon"
     ),
+    .executableTarget(
+      name: "AppleLivePreviewProbe",
+      path: "Sources/AppleLivePreviewProbe"
+    ),
     .testTarget(
       name: "VoiceControlDaemonTests",
       dependencies: [

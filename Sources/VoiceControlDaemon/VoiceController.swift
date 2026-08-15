@@ -10,7 +10,7 @@ final class VoiceController {
   private let audio = AudioCapture()
   private let keywords: KeywordListener
   private let applicationController = ApplicationController()
-  private let transcriber = ParakeetTranscriber()
+  private let transcriber = PromptTranscriber()
   private let liveAudioRouter = LiveAudioBufferRouter()
   private var machine = VoiceStateMachine()
   private var modelReady = false
@@ -64,13 +64,13 @@ final class VoiceController {
 
     Task { @MainActor in
       do {
-        print("Loading Parakeet from the existing FluidAudio cache")
+        print("Loading \(transcriber.name)")
         try await transcriber.prepare()
-        print("Parakeet ready")
+        print("\(transcriber.name) ready")
         modelReady = true
         becomeReadyIfPossible()
       } catch {
-        fail("Could not load Parakeet. \(error.localizedDescription)", recover: false)
+        fail("Could not load \(transcriber.name). \(error.localizedDescription)", recover: false)
       }
     }
   }
@@ -313,12 +313,12 @@ final class VoiceController {
           },
           onError: { [weak self] message in
             guard let self, self.machine.phase == .recording else { return }
-            self.fail("Live Parakeet transcription failed: \(message)")
+            self.fail("Live \(self.transcriber.name) failed: \(message)")
           }
         )
       } catch {
         guard machine.phase == .recording else { return }
-        fail("Could not start live Parakeet transcription: \(error.localizedDescription)")
+        fail("Could not start live \(transcriber.name): \(error.localizedDescription)")
       }
     }
   }
@@ -412,7 +412,7 @@ final class VoiceController {
           submitPhrases: configuration.submitPhrases
         )
         guard !cleaned.isEmpty else {
-          fail("Parakeet returned an empty prompt")
+          fail("\(transcriber.name) returned an empty prompt")
           return
         }
         print("Transcript: \(cleaned)")
@@ -491,6 +491,6 @@ final class VoiceController {
     print(
       "  silence fallback: \(configuration.silenceSeconds)s at \(configuration.silenceThresholdDB)dBFS"
     )
-    print("  transcription: local Parakeet v3 via FluidAudio")
+    print("  transcription: \(transcriber.name)")
   }
 }

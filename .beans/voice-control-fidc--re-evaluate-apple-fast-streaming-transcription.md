@@ -5,7 +5,7 @@ status: in-progress
 type: task
 priority: normal
 created_at: 2026-08-15T17:27:49Z
-updated_at: 2026-08-15T17:59:09Z
+updated_at: 2026-08-15T18:02:28Z
 ---
 
 The prior SpeechTranscriber comparison enabled volatile results but omitted ReportingOption.fastResults or the progressiveTranscription preset. Apple documents fastResults as reducing latency with a smaller context window. Re-run the existing recorded corpus with the intended immediate live configuration, compare latency and semantic accuracy, then correct the engine decision.
@@ -41,3 +41,7 @@ Added a privileged complete-workflow energy runner. It warms each engine after t
 ## Complete-workflow energy result
 
 The quiet run contained no `rustc` or `cargo` samples. Baseline combined CPU/GPU/ANE power averaged 67.8 mW. Apple progressive transcription averaged 112.8 mW over 59.29 seconds, about 2.67 J above baseline for the five-prompt corpus or 0.535 J per prompt. Parakeet rolling preview plus final transcription averaged 332.2 mW over 59.74 seconds, about 15.80 J above baseline or 3.159 J per prompt. Apple used approximately 83.1% less incremental energy for the complete production-shaped workflow.
+
+## Production integration
+
+Added an availability-selected prompt transcriber. macOS 26 uses Apple `.progressiveTranscription`, finalizes the existing live stream, and falls back to file transcription only if no live session exists. macOS 14 and 15 retain the existing Parakeet path. Updated controller diagnostics and README behavior. `swift build` and `swift test` pass. A live application smoke test remains before the production decision is final.

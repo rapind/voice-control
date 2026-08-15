@@ -2,13 +2,69 @@
 import FluidAudio
 import Foundation
 
-actor ParakeetTranscriber {
+protocol PromptTranscriberBackend: Sendable {
+  var name: String { get }
+
+  func prepare() async throws
+  func startLiveTranscription(
+    input: LiveAudioBufferSink,
+    onUpdate: @escaping @MainActor @Sendable (String) -> Void,
+    onError: @escaping @MainActor @Sendable (String) -> Void
+  ) async throws
+  func stopLiveTranscription() async
+  func transcribe(fileURL: URL) async throws -> String
+}
+
+final class PromptTranscriber {
+  let name: String
+
+  private let backend: any PromptTranscriberBackend
+
+  init() {
+    if #available(macOS 26.0, *) {
+      let backend = AppleSpeechTranscriber()
+      self.backend = backend
+      self.name = backend.name
+    } else {
+      let backend = ParakeetTranscriber()
+      self.backend = backend
+      self.name = backend.name
+    }
+  }
+
+  func prepare() async throws {
+    try await backend.prepare()
+  }
+
+  func startLiveTranscription(
+    input: LiveAudioBufferSink,
+    onUpdate: @escaping @MainActor @Sendable (String) -> Void,
+    onError: @escaping @MainActor @Sendable (String) -> Void
+  ) async throws {
+    try await backend.startLiveTranscription(
+      input: input,
+      onUpdate: onUpdate,
+      onError: onError
+    )
+  }
+
+  func stopLiveTranscription() async {
+    await backend.stopLiveTranscription()
+  }
+
+  func transcribe(fileURL: URL) async throws -> String {
+    try await backend.transcribe(fileURL: fileURL)
+  }
+}
+
+actor ParakeetTranscriber: PromptTranscriberBackend {
   private var manager: AsrManager?
   private var models: AsrModels?
   private var liveManager: AsrManager?
   private var liveInput: LiveAudioBufferSink?
   private var liveInputTask: Task<Void, Never>?
   private var liveGeneration = 0
+  nonisolated let name = "local Parakeet v3 via FluidAudio"
 
   func prepare() async throws {
     let cacheDirectory = AsrModels.defaultCacheDirectory(for: .v3)

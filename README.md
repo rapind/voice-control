@@ -2,11 +2,11 @@
 
 This is throwaway code answering one question: can one small macOS process reliably own the complete voice transaction without wrapping Codex or interfering with the target application's rendering?
 
-The daemon listens for a wake phrase, focuses the configured application, shows a live local Parakeet transcription while recording, and replaces that preview with a final full-context transcript before pressing Return.
+The daemon listens for a wake phrase, focuses the configured application, shows a live transcription while recording, finalizes that transcript, and presses Return. It uses Apple Speech progressive transcription on macOS 26 and FluidAudio Parakeet on macOS 14 and 15.
 
 ## Before running
 
-1. Load Parakeet once in TypeWhisper. The prototype reuses the model files already stored in FluidAudio's shared cache. TypeWhisper does not need to remain open.
+1. On macOS 14 or 15, load Parakeet once in TypeWhisper. The prototype reuses the model files already stored in FluidAudio's shared cache. TypeWhisper does not need to remain open. On macOS 26, the app installs and uses Apple's on-device `en-US` speech asset.
 2. Run Ghostty or ChatGPT, whichever is selected by `target` in the configuration.
 
 ## Run the installed app
@@ -105,16 +105,16 @@ Both targets support:
 
 For Ghostty, `new chat` opens a new tab, types `codex`, and presses Return. Ghostty also supports `focus next` and `focus previous`. For ChatGPT, `new chat` sends Command-N. Numbered focus commands send Command-1 through Command-9 to the selected application.
 
-All other speech remains a normal prompt. While recording, rolling full-context Parakeet passes revise the visible text in place. After a configured submit phrase or the silence timeout, the preview is cleared and replaced with the final Parakeet transcript before Return is sent.
+All other speech remains a normal prompt. On macOS 26, Apple progressive results revise the visible text while recording and finalize through the end of the same audio stream. On macOS 14 and 15, rolling full-context Parakeet passes provide the preview and a final file pass remains authoritative.
 
 The configured submit phrase creates an audio cutoff. The phrase itself and anything spoken after it are excluded from final transcription. Say a configured cancel phrase to clear the live preview, discard the recording, and return to wake listening without submitting.
 
 ## Prototype limits
 
 - It targets the selected application's frontmost process when the wake phrase is detected. If another app is frontmost, it falls back to the selected running application.
-- Live preview updates run about every 1.5 seconds and may revise earlier words. The final full-context Parakeet pass remains authoritative.
+- Apple Speech preview results may revise earlier words until stream finalization. The Parakeet fallback updates about every 1.5 seconds and replaces its preview with the final full-context pass.
 - Live preview typing stops rather than sending text to an application that is no longer frontmost.
-- Model downloading and Hugging Face authentication are deliberately out of scope. The prototype fails clearly when the shared cached model is missing.
+- Model downloading and Hugging Face authentication are deliberately out of scope for the Parakeet fallback. It fails clearly when the shared cached model is missing. Apple Speech assets are installed through `AssetInventory`.
 - Silence detection uses a configurable RMS threshold, not a neural VAD.
 - The app is ad-hoc signed with a stable identifier-only designated requirement. This avoids a paid Apple developer account and should preserve Accessibility approval across local rebuilds. It is appropriate for this private local tool, but weaker than certificate-backed signing because another local app using the same bundle identifier could satisfy the requirement.
 

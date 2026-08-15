@@ -10,7 +10,10 @@ struct SpeechWorkflowComparisonProbe {
 
     do {
       guard CommandLine.arguments.count >= 2 else {
-        throw ProbeError("Use record, compare <manifest>, or stress <engine> <manifest> <repeats>")
+        throw ProbeError(
+          "Use record, compare <manifest>, warmup <engine> <manifest>, "
+            + "or stress <engine> <manifest> <repeats>"
+        )
       }
       switch CommandLine.arguments[1] {
       case "record":
@@ -35,6 +38,15 @@ struct SpeechWorkflowComparisonProbe {
         }
         try await compare(
           manifestURL: URL(fileURLWithPath: CommandLine.arguments[2])
+        )
+
+      case "warmup":
+        guard CommandLine.arguments.count >= 4 else {
+          throw ProbeError("warmup requires apple|parakeet and a manifest path")
+        }
+        try await warmup(
+          engine: CommandLine.arguments[2],
+          manifestURL: URL(fileURLWithPath: CommandLine.arguments[3])
         )
 
       case "stress":
@@ -85,6 +97,25 @@ struct SpeechWorkflowComparisonProbe {
     }
     print("Results: \(outputURL.path)")
   }
+  @available(macOS 26.0, *)
+  private static func warmup(engine: String, manifestURL: URL) async throws {
+    let manifest = try loadManifest(manifestURL)
+    guard let prompt = manifest.prompts.first else {
+      throw ProbeError("The corpus manifest contains no prompts")
+    }
+    let fileURL = manifestURL.deletingLastPathComponent()
+      .appendingPathComponent(prompt.audioFile)
+    switch engine {
+    case "apple":
+      _ = try await AppleWorkflow().run(prompt: prompt, fileURL: fileURL)
+    case "parakeet":
+      _ = try await ParakeetWorkflow().run(prompt: prompt, fileURL: fileURL)
+    default:
+      throw ProbeError("Unknown engine \(engine)")
+    }
+    print("WARMUP_RESULT engine=\(engine)")
+  }
+
 
   @available(macOS 26.0, *)
   private static func stress(engine: String, manifestURL: URL, repeats: Int) async throws {

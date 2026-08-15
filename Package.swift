@@ -25,6 +25,13 @@ let package = Package(
       name: "AppleLivePreviewProbe",
       path: "Sources/AppleLivePreviewProbe"
     ),
+    .executableTarget(
+      name: "SpeechWorkflowComparisonProbe",
+      dependencies: [
+        .product(name: "FluidAudio", package: "FluidAudio"),
+      ],
+      path: "Sources/SpeechWorkflowComparisonProbe"
+    ),
     .testTarget(
       name: "VoiceControlDaemonTests",
       dependencies: [

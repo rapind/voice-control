@@ -5,7 +5,7 @@ status: in-progress
 type: task
 priority: normal
 created_at: 2026-08-15T17:27:49Z
-updated_at: 2026-08-15T17:31:11Z
+updated_at: 2026-08-15T17:44:49Z
 ---
 
 The prior SpeechTranscriber comparison enabled volatile results but omitted ReportingOption.fastResults or the progressiveTranscription preset. Apple documents fastResults as reducing latency with a smaller context window. Re-run the existing recorded corpus with the intended immediate live configuration, compare latency and semantic accuracy, then correct the engine decision.
@@ -20,3 +20,14 @@ The prior SpeechTranscriber comparison enabled volatile results but omitted Repo
 The earlier probe used `.volatileResults` without `.fastResults`. Apple documents `fastResults` as using a smaller context window for lower latency, and `.progressiveTranscription` enables both options. Replaying the same five microphone recordings in real time with `.progressiveTranscription` produced first results at 2.098, 2.104, 2.085, 2.094, and 2.092 seconds, a 2.095-second mean. Parakeet previously averaged 2.946 seconds, so correctly configured Apple live preview is about 0.851 seconds faster.
 
 Progressive final transcripts remained semantically equivalent on all five prompts. It also rendered `ChatGPT` correctly in the third prompt. The smaller fast-results context introduced no meaningful downstream quality loss in this corpus.
+
+## End-to-end follow-up
+
+- [ ] Record a fresh AirPods corpus with short, medium, and long prompts.
+- [ ] Compare Apple progressive preview plus stream finalization against Parakeet rolling preview plus final file transcription.
+- [ ] Measure complete-workflow CPU, ANE, and energy use.
+- [ ] Commit the end-to-end comparison milestone before cleanup.
+
+## Complete-workflow probe
+
+Added a committed probe that records a fixed five-prompt corpus through the macOS default microphone, then replays each recording sequentially through Apple progressive preview plus stream finalization and Parakeet rolling preview plus final file transcription. Sequential replay avoids the CPU contention in the original simultaneous comparison. On the saved 11.9-second smoke prompt, Apple previewed at 2.088 seconds and finalized 0.045 seconds after audio ended; Parakeet previewed at 1.673 seconds and finalized after 0.183 seconds. This reverses the earlier preview comparison for that prompt and confirms that a fresh varied-length AirPods corpus is necessary.

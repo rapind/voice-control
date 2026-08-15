@@ -39,7 +39,7 @@ final class VoiceController {
       liveAudioRouter.appendCopy(of: buffer)
     }
     audio.onLevel = { [weak self] db in
-      guard db >= (self?.configuration.silenceThresholdDB ?? -42) else { return }
+      guard db >= (self?.configuration.silenceThresholdDB ?? -45) else { return }
       DispatchQueue.main.async {
         guard let self, self.machine.phase == .recording, Date() >= self.ignoreSilenceUntil else {
           return

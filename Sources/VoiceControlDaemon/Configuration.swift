@@ -87,7 +87,7 @@ struct Configuration: Equatable {
     submitPhrases: ["ghost it"],
     cancelPhrases: ["ghost cancel"],
     silenceSeconds: 4,
-    silenceThresholdDB: -42,
+    silenceThresholdDB: -45,
     maximumRecordingSeconds: 90,
     applicationCommands: [
       .ghostty: .ghosttyDefaults,
@@ -103,7 +103,7 @@ struct Configuration: Equatable {
     cancel = ["ghost cancel"]
 
     silence_seconds = 4
-    silence_threshold_db = -42
+    silence_threshold_db = -45
     maximum_recording_seconds = 90
 
     [applications.ghostty.commands]

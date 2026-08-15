@@ -47,7 +47,7 @@ submit = ["send it", "sent it"]
 cancel = ["cancel it"]
 
 silence_seconds = 4
-silence_threshold_db = -42
+silence_threshold_db = -45
 maximum_recording_seconds = 90
 
 [applications.ghostty.commands]

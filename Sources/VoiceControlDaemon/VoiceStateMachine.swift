@@ -57,6 +57,10 @@ struct VoiceStateMachine {
       phase = .recording
       return [.beginPromptRecording]
 
+    case (.waitingForWake, .commandDetected(let command)):
+      phase = .injecting
+      return [.executeCommand(command)]
+
     case (.recording, .submitDetected),
       (.recording, .silenceExpired),
       (.recording, .maximumDurationExpired):

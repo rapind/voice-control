@@ -154,10 +154,7 @@ final class VoiceController {
       }
 
     case .beginPromptRecording:
-      let capturedApplication = applicationController.captureFrontmostApplication()
-      targetPID = capturedApplication?.processIdentifier
-      sessionTarget = capturedApplication?.target
-      heardPromptSpeech = false
+      captureSessionTarget()
       recordingStartedAt = Date()
       ignoreSilenceUntil = Date().addingTimeInterval(0.6)
       lastSpeechAt = ignoreSilenceUntil
@@ -260,6 +257,27 @@ final class VoiceController {
 
     switch machine.phase {
     case .waitingForWake:
+      if let command = ApplicationCommand.parse(
+        transcript.text,
+        wakePhrases: configuration.wakePhrases,
+        mappings: configuration.commandMappings(for: nil)
+      ),
+        command.isDirectFocusCommand
+      {
+        captureSessionTarget()
+        if let sessionTarget,
+          let targetCommand = ApplicationCommand.parse(
+            transcript.text,
+            wakePhrases: configuration.wakePhrases,
+            mappings: configuration.commandMappings(for: sessionTarget)
+          ),
+          targetCommand.isDirectFocusCommand
+        {
+          print("\(sessionTarget.displayName) direct focus command detected: \(targetCommand)")
+          dispatch(.commandDetected(targetCommand))
+          return
+        }
+      }
       if PhraseMatcher.contains(any: configuration.wakePhrases, in: transcript.text) {
         print("Wake phrase detected")
         dispatch(.wakeDetected)
@@ -412,6 +430,12 @@ final class VoiceController {
         fail("Transcription failed: \(error.localizedDescription)")
       }
     }
+  }
+
+  private func captureSessionTarget() {
+    let capturedApplication = applicationController.captureFrontmostApplication()
+    targetPID = capturedApplication?.processIdentifier
+    sessionTarget = capturedApplication?.target
   }
 
   private func execute(_ command: ApplicationCommand) {

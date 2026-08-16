@@ -24,11 +24,11 @@ import Testing
 
       [applications.ghostty.commands]
       new_chat = ["open terminal chat"]
-      focus_1 = ["focus 1"]
+      focus_1 = ["focus one"]
 
       [applications.chatgpt.commands]
       new_chat = ["open app chat"]
-      focus_1 = ["focus 1"]
+      focus_1 = ["focus one"]
       """.utf8
     )
   )
@@ -49,7 +49,7 @@ import Testing
   )
   #expect(
     ApplicationCommand.parse(
-      "focus 1",
+      "focus one",
       wakePhrases: configuration.wakePhrases,
       mappings: configuration.commandMappings(for: .chatGPT)
     ) == .focusItem(1)
@@ -102,6 +102,7 @@ import Testing
       [applications.ghostty.commands]
       interrupt_session = ["quit session"]
       start_session = ["start session"]
+      share_session = ["share session"]
       """.utf8
     )
   )
@@ -120,6 +121,13 @@ import Testing
       wakePhrases: configuration.wakePhrases,
       mappings: ghosttyMappings
     ) == .startSession
+  )
+  #expect(
+    ApplicationCommand.parse(
+      "share session",
+      wakePhrases: configuration.wakePhrases,
+      mappings: ghosttyMappings
+    ) == .shareSession
   )
   #expect(
     ApplicationCommand.parse(
@@ -144,7 +152,7 @@ import Testing
   )
   #expect(
     ApplicationCommand.parse(
-      "focus 1",
+      "focus one",
       wakePhrases: configuration.wakePhrases,
       mappings: mappings
     ) == .focusItem(1)
@@ -172,10 +180,17 @@ import Testing
   )
   #expect(
     ApplicationCommand.parse(
-      "focus 1",
+      "focus one",
       wakePhrases: configuration.wakePhrases,
       mappings: configuration.commandMappings(for: .chrome)
     ) == .focusItem(1)
+  )
+  #expect(
+    ApplicationCommand.parse(
+      "focus 1",
+      wakePhrases: configuration.wakePhrases,
+      mappings: configuration.commandMappings(for: .chrome)
+    ) == nil
   )
 }
 
@@ -249,19 +264,6 @@ import Testing
   #expect(configuration.contextualPhrases.contains("terminal action"))
 }
 
-@Test func rejectsGhosttyOnlyNavigationCommandsForChatGPT() {
-  let data = Data(
-    """
-    [applications.chatgpt.commands]
-    next = ["focus next"]
-    """.utf8
-  )
-
-  #expect(throws: ConfigurationError.self) {
-    try Configuration.decodeTOML(data)
-  }
-}
-
 @Test func decodesCustomPhrasesAndTiming() throws {
   let configuration = try Configuration.decodeTOML(
     Data(
@@ -286,7 +288,7 @@ import Testing
   #expect(configuration.silenceThresholdDB == -38)
   #expect(configuration.maximumRecordingSeconds == 120)
   #expect(configuration.applicationCommands[.ghostty]?.newChat == ["make a chat"])
-  #expect(configuration.applicationCommands[.ghostty]?.next == CommandPhrases.ghosttyDefaults.next)
+  #expect(configuration.applicationCommands[.ghostty]?.focus1 == ["focus one"])
 }
 
 @Test func rejectsPhraseCollisionAcrossActions() throws {

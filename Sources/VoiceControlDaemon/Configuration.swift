@@ -8,8 +8,7 @@ struct CommandPhrases: Equatable {
   var compactContext: [String]
   var interruptSession: [String]
   var startSession: [String]
-  var next: [String]
-  var previous: [String]
+  var shareSession: [String]
   var focus1: [String]
   var focus2: [String]
   var focus3: [String]
@@ -27,17 +26,16 @@ struct CommandPhrases: Equatable {
     compactContext: ["compact context"],
     interruptSession: ["quit session"],
     startSession: ["start session"],
-    next: ["focus next"],
-    previous: ["focus previous", "focus prev"],
-    focus1: ["focus 1"],
-    focus2: ["focus 2"],
-    focus3: ["focus 3"],
-    focus4: ["focus 4"],
-    focus5: ["focus 5"],
-    focus6: ["focus 6"],
-    focus7: ["focus 7"],
-    focus8: ["focus 8"],
-    focus9: ["focus 9"]
+    shareSession: ["share session"],
+    focus1: ["focus one"],
+    focus2: ["focus two"],
+    focus3: ["focus three"],
+    focus4: ["focus four"],
+    focus5: ["focus five"],
+    focus6: ["focus six"],
+    focus7: ["focus seven"],
+    focus8: ["focus eight"],
+    focus9: ["focus nine"]
   )
 
   static let chatGPTDefaults = CommandPhrases(
@@ -47,17 +45,16 @@ struct CommandPhrases: Equatable {
     compactContext: [],
     interruptSession: [],
     startSession: [],
-    next: [],
-    previous: [],
-    focus1: ["focus 1"],
-    focus2: ["focus 2"],
-    focus3: ["focus 3"],
-    focus4: ["focus 4"],
-    focus5: ["focus 5"],
-    focus6: ["focus 6"],
-    focus7: ["focus 7"],
-    focus8: ["focus 8"],
-    focus9: ["focus 9"]
+    shareSession: [],
+    focus1: ["focus one"],
+    focus2: ["focus two"],
+    focus3: ["focus three"],
+    focus4: ["focus four"],
+    focus5: ["focus five"],
+    focus6: ["focus six"],
+    focus7: ["focus seven"],
+    focus8: ["focus eight"],
+    focus9: ["focus nine"]
   )
 
   static let chromeDefaults = CommandPhrases(
@@ -67,17 +64,16 @@ struct CommandPhrases: Equatable {
     compactContext: [],
     interruptSession: [],
     startSession: [],
-    next: [],
-    previous: [],
-    focus1: ["focus 1"],
-    focus2: ["focus 2"],
-    focus3: ["focus 3"],
-    focus4: ["focus 4"],
-    focus5: ["focus 5"],
-    focus6: ["focus 6"],
-    focus7: ["focus 7"],
-    focus8: ["focus 8"],
-    focus9: ["focus 9"]
+    shareSession: [],
+    focus1: ["focus one"],
+    focus2: ["focus two"],
+    focus3: ["focus three"],
+    focus4: ["focus four"],
+    focus5: ["focus five"],
+    focus6: ["focus six"],
+    focus7: ["focus seven"],
+    focus8: ["focus eight"],
+    focus9: ["focus nine"]
   )
 
   var nonFocusMappings: [(ApplicationCommand, [String])] {
@@ -87,8 +83,7 @@ struct CommandPhrases: Equatable {
       (.compactContext, compactContext),
       (.interruptSession, interruptSession),
       (.startSession, startSession),
-      (.nextItem, next),
-      (.previousItem, previous),
+      (.shareSession, shareSession),
     ] + positionalMappings
   }
 
@@ -151,42 +146,41 @@ struct Configuration: Equatable {
     compact_context = ["compact context"]
     interrupt_session = ["quit session"]
     start_session = ["start session"]
-    next = ["focus next"]
-    previous = ["focus previous", "focus prev"]
-    focus_1 = ["focus 1"]
-    focus_2 = ["focus 2"]
-    focus_3 = ["focus 3"]
-    focus_4 = ["focus 4"]
-    focus_5 = ["focus 5"]
-    focus_6 = ["focus 6"]
-    focus_7 = ["focus 7"]
-    focus_8 = ["focus 8"]
-    focus_9 = ["focus 9"]
+    share_session = ["share session"]
+    focus_1 = ["focus one"]
+    focus_2 = ["focus two"]
+    focus_3 = ["focus three"]
+    focus_4 = ["focus four"]
+    focus_5 = ["focus five"]
+    focus_6 = ["focus six"]
+    focus_7 = ["focus seven"]
+    focus_8 = ["focus eight"]
+    focus_9 = ["focus nine"]
 
     [applications.chatgpt.commands]
     focus = ["focus chat"]
     new_chat = ["new chat"]
-    focus_1 = ["focus 1"]
-    focus_2 = ["focus 2"]
-    focus_3 = ["focus 3"]
-    focus_4 = ["focus 4"]
-    focus_5 = ["focus 5"]
-    focus_6 = ["focus 6"]
-    focus_7 = ["focus 7"]
-    focus_8 = ["focus 8"]
-    focus_9 = ["focus 9"]
+    focus_1 = ["focus one"]
+    focus_2 = ["focus two"]
+    focus_3 = ["focus three"]
+    focus_4 = ["focus four"]
+    focus_5 = ["focus five"]
+    focus_6 = ["focus six"]
+    focus_7 = ["focus seven"]
+    focus_8 = ["focus eight"]
+    focus_9 = ["focus nine"]
 
     [applications.chrome.commands]
     focus = ["focus chrome"]
-    focus_1 = ["focus 1"]
-    focus_2 = ["focus 2"]
-    focus_3 = ["focus 3"]
-    focus_4 = ["focus 4"]
-    focus_5 = ["focus 5"]
-    focus_6 = ["focus 6"]
-    focus_7 = ["focus 7"]
-    focus_8 = ["focus 8"]
-    focus_9 = ["focus 9"]
+    focus_1 = ["focus one"]
+    focus_2 = ["focus two"]
+    focus_3 = ["focus three"]
+    focus_4 = ["focus four"]
+    focus_5 = ["focus five"]
+    focus_6 = ["focus six"]
+    focus_7 = ["focus seven"]
+    focus_8 = ["focus eight"]
+    focus_9 = ["focus nine"]
     """
 
   static var defaultFileURL: URL {
@@ -254,8 +248,7 @@ struct Configuration: Equatable {
       compactContext: raw?.compactContext ?? defaults.compactContext,
       interruptSession: raw?.interruptSession ?? defaults.interruptSession,
       startSession: raw?.startSession ?? defaults.startSession,
-      next: raw?.next ?? defaults.next,
-      previous: raw?.previous ?? defaults.previous,
+      shareSession: raw?.shareSession ?? defaults.shareSession,
       focus1: raw?.focus1 ?? defaults.focus1,
       focus2: raw?.focus2 ?? defaults.focus2,
       focus3: raw?.focus3 ?? defaults.focus3,
@@ -319,8 +312,7 @@ struct Configuration: Equatable {
       commands.compactContext = Self.normalizedPhrases(commands.compactContext)
       commands.interruptSession = Self.normalizedPhrases(commands.interruptSession)
       commands.startSession = Self.normalizedPhrases(commands.startSession)
-      commands.next = Self.normalizedPhrases(commands.next)
-      commands.previous = Self.normalizedPhrases(commands.previous)
+      commands.shareSession = Self.normalizedPhrases(commands.shareSession)
       commands.focus1 = Self.normalizedPhrases(commands.focus1)
       commands.focus2 = Self.normalizedPhrases(commands.focus2)
       commands.focus3 = Self.normalizedPhrases(commands.focus3)
@@ -335,15 +327,14 @@ struct Configuration: Equatable {
     for target in [ApplicationTarget.chatGPT, .chrome] {
       let commands = applicationCommands[target]!
       guard
-        commands.next.isEmpty,
-        commands.previous.isEmpty,
         commands.clearContext.isEmpty,
         commands.compactContext.isEmpty,
         commands.interruptSession.isEmpty,
-        commands.startSession.isEmpty
+        commands.startSession.isEmpty,
+        commands.shareSession.isEmpty
       else {
         throw ConfigurationError(
-          "\(target.displayName) does not support context, session, next, or previous commands"
+          "\(target.displayName) does not support context or session commands"
         )
       }
     }
@@ -456,8 +447,7 @@ private struct RawCommandPhrases: Decodable {
   var compactContext: [String]?
   var interruptSession: [String]?
   var startSession: [String]?
-  var next: [String]?
-  var previous: [String]?
+  var shareSession: [String]?
   var focus1: [String]?
   var focus2: [String]?
   var focus3: [String]?
@@ -469,12 +459,13 @@ private struct RawCommandPhrases: Decodable {
   var focus9: [String]?
 
   enum CodingKeys: String, CodingKey {
-    case focus, next, previous
+    case focus
     case newChat = "new_chat"
     case clearContext = "clear_context"
     case compactContext = "compact_context"
     case interruptSession = "interrupt_session"
     case startSession = "start_session"
+    case shareSession = "share_session"
     case focus1 = "focus_1"
     case focus2 = "focus_2"
     case focus3 = "focus_3"

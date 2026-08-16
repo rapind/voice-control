@@ -284,7 +284,7 @@ final class ApplicationController {
       }
     case .clearContext, .compactContext:
       return nil
-    case .interruptSession, .startSession:
+    case .interruptSession, .startSession, .shareSession:
       return nil
     case .focusItem(let number):
       let keyCodes: [Int: CGKeyCode] = [
@@ -294,12 +294,6 @@ final class ApplicationController {
       let flags: CGEventFlags =
         target == .ghostty ? [.maskControl, .maskAlternate] : .maskCommand
       return (keyCode, flags)
-    case .nextItem:
-      guard target == .ghostty else { return nil }
-      return (30, [.maskCommand, .maskShift])
-    case .previousItem:
-      guard target == .ghostty else { return nil }
-      return (33, [.maskCommand, .maskShift])
     }
   }
 
@@ -310,6 +304,7 @@ final class ApplicationController {
     switch command {
     case .clearContext: return "/clear"
     case .compactContext: return "/compact"
+    case .shareSession: return "/collab"
     default: return nil
     }
   }
@@ -353,7 +348,8 @@ final class ApplicationController {
     let modifierClause = modifier.map { " using \($0)" } ?? ""
     guard
       let script = NSAppleScript(
-        source: "tell application id \"com.apple.systemevents\" to key code \(keyCode)\(modifierClause)"
+        source:
+          "tell application id \"com.apple.systemevents\" to key code \(keyCode)\(modifierClause)"
       )
     else {
       throw InjectionError("Could not create the keyboard event request")

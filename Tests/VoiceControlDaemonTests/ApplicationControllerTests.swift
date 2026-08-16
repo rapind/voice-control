@@ -26,7 +26,8 @@ import Testing
 
   #expect(controller.slashCommandText(for: .clearContext, target: .ghostty) == "/clear")
   #expect(controller.slashCommandText(for: .compactContext, target: .ghostty) == "/compact")
-  #expect(controller.slashCommandText(for: .clearContext, target: .chrome) == nil)
+  #expect(controller.slashCommandText(for: .shareSession, target: .ghostty) == "/collab")
+  #expect(controller.slashCommandText(for: .shareSession, target: .chrome) == nil)
 }
 
 @Test func ghosttyStartSessionSubmitsOMP() {

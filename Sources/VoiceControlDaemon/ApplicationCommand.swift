@@ -7,13 +7,17 @@ enum ApplicationCommand: Equatable, Hashable {
   case compactContext
   case interruptSession
   case startSession
+  case shareSession
   case focusItem(Int)
-  case nextItem
-  case previousItem
 
   var focusTarget: ApplicationTarget? {
     if case .focus(let target) = self { return target }
     return nil
+  }
+
+  var isDirectFocusCommand: Bool {
+    guard case .focusItem(let number) = self else { return false }
+    return (1...8).contains(number)
   }
 
   func target(frontmost: ApplicationTarget?) -> ApplicationTarget? {

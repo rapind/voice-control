@@ -57,51 +57,50 @@ clear_context = ["clear context"]
 compact_context = ["compact context"]
 interrupt_session = ["quit session"]
 start_session = ["start session"]
-next = ["focus next"]
-previous = ["focus previous", "focus prev"]
-focus_1 = ["focus 1"]
-focus_2 = ["focus 2"]
-focus_3 = ["focus 3"]
-focus_4 = ["focus 4"]
-focus_5 = ["focus 5"]
-focus_6 = ["focus 6"]
-focus_7 = ["focus 7"]
-focus_8 = ["focus 8"]
-focus_9 = ["focus 9"]
+share_session = ["share session"]
+focus_1 = ["focus one"]
+focus_2 = ["focus two"]
+focus_3 = ["focus three"]
+focus_4 = ["focus four"]
+focus_5 = ["focus five"]
+focus_6 = ["focus six"]
+focus_7 = ["focus seven"]
+focus_8 = ["focus eight"]
+focus_9 = ["focus nine"]
 
 [applications.chatgpt.commands]
 focus = ["focus chat"]
 new_chat = ["new chat"]
-focus_1 = ["focus 1"]
-focus_2 = ["focus 2"]
-focus_3 = ["focus 3"]
-focus_4 = ["focus 4"]
-focus_5 = ["focus 5"]
-focus_6 = ["focus 6"]
-focus_7 = ["focus 7"]
-focus_8 = ["focus 8"]
-focus_9 = ["focus 9"]
+focus_1 = ["focus one"]
+focus_2 = ["focus two"]
+focus_3 = ["focus three"]
+focus_4 = ["focus four"]
+focus_5 = ["focus five"]
+focus_6 = ["focus six"]
+focus_7 = ["focus seven"]
+focus_8 = ["focus eight"]
+focus_9 = ["focus nine"]
 
 [applications.chrome.commands]
 focus = ["focus chrome"]
-focus_1 = ["focus 1"]
-focus_2 = ["focus 2"]
-focus_3 = ["focus 3"]
-focus_4 = ["focus 4"]
-focus_5 = ["focus 5"]
-focus_6 = ["focus 6"]
-focus_7 = ["focus 7"]
-focus_8 = ["focus 8"]
-focus_9 = ["focus 9"]
+focus_1 = ["focus one"]
+focus_2 = ["focus two"]
+focus_3 = ["focus three"]
+focus_4 = ["focus four"]
+focus_5 = ["focus five"]
+focus_6 = ["focus six"]
+focus_7 = ["focus seven"]
+focus_8 = ["focus eight"]
+focus_9 = ["focus nine"]
 ```
 
 Save the file and the app applies valid changes within about one second. You do not need to rebuild or restart it. Invalid TOML leaves the last working configuration active and shows a config error in the menu. Older `target` settings are accepted but no longer control routing.
 
 `vocabulary` lists words and short phrases to bias Apple Speech toward during dictation. It is a recognition hint, not a replacement rule, so adding `bean` does not turn legitimate uses of `being` into `bean`.
 
-The wake phrase starts recording without changing focus. Dictation is bound to whichever window was frontmost when recording started. Direct focus phrases are global: `focus ghost tee`, `focus chat`, and `focus chrome`.
+The wake phrase starts recording without changing focus. Dictation is bound to whichever window was frontmost when recording started. Application-focus phrases, `focus ghost tee`, `focus chat`, and `focus chrome`, execute after a wake phrase.
 
-Other commands use the supported application that was frontmost at wake time. In Ghostty, `focus 1` sends Control+Option+1 for direct Herdr workspace switching. In ChatGPT and Chrome, it sends Command+1. If another application was frontmost, the phrase is consumed without sending a keyboard shortcut.
+Focus one through eight execute directly from idle: in Ghostty they send Control+Option+1 through Control+Option+8, and in ChatGPT or Chrome they send Command+1 through Command+8. If another application was frontmost, the phrase is consumed without sending a keyboard shortcut.
 
 Use another configuration file when launching if needed:
 
@@ -115,14 +114,14 @@ The menu-bar item shows the current state and active control phrases. Use **Open
 
 ## Application commands
 
-The wake phrase only starts recording. It does not focus an application. Command aliases execute immediately from Apple Speech partials and do not require a submit phrase.
+The wake phrase starts recording. Once recording, command aliases execute immediately from Apple Speech partials and do not require a submit phrase. `focus one` through `focus eight` are the exception: they execute directly from idle without the wake phrase.
 
 Ghostty, ChatGPT, and Chrome support:
 
-- `focus 1` through `focus 9`
+- `focus one` through `focus nine` after a wake phrase
 - Their global application focus phrase
 
-For Ghostty, `new chat` opens a new tab, types `codex`, and presses Return. `clear context` sends `/clear`, and `compact context` sends `/compact`; both press Return. `quit session` sends Control-D to the foreground terminal process. `start session` types `omp` and presses Return. Ghostty also supports `focus next` and `focus previous`. Numbered focus commands send Control+Option+1 through Control+Option+9, matching the recommended Herdr workspace bindings. For ChatGPT, `new chat` sends Command-N. Chrome does not define a `new chat` command. Numbered focus commands in ChatGPT and Chrome send Command-1 through Command-9.
+For Ghostty, `new chat` opens a new tab, types `codex`, and presses Return. `clear context` sends `/clear`, and `compact context` sends `/compact`; both press Return. `quit session` sends Control-D to the foreground terminal process. `start session` types `omp` and presses Return. `share session` sends `/collab` and presses Return, opening OMP sharing with its QR code. Numbered focus commands send Control+Option+1 through Control+Option+9, matching the recommended Herdr workspace bindings. For ChatGPT, `new chat` sends Command-N. Chrome does not define a `new chat` command. Numbered focus commands in ChatGPT and Chrome send Command-1 through Command-9.
 
 All other speech remains a normal prompt. On macOS 26, Apple progressive results revise the visible text while recording and finalize through the end of the same audio stream. On macOS 14 and 15, rolling full-context Parakeet passes provide the preview and a final file pass remains authoritative.
 

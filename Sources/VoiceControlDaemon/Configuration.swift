@@ -6,6 +6,9 @@ struct CommandPhrases: Equatable {
   var newChat: [String]
   var clearContext: [String]
   var compactContext: [String]
+  var interruptSession: [String]
+  var startSession: [String]
+  var restartSession: [String]
   var next: [String]
   var previous: [String]
   var focus1: [String]
@@ -23,6 +26,9 @@ struct CommandPhrases: Equatable {
     newChat: ["new chat"],
     clearContext: ["clear context"],
     compactContext: ["compact context"],
+    interruptSession: ["quit session"],
+    startSession: ["start session"],
+    restartSession: ["restart session"],
     next: ["focus next"],
     previous: ["focus previous", "focus prev"],
     focus1: ["focus 1"],
@@ -41,6 +47,9 @@ struct CommandPhrases: Equatable {
     newChat: ["new chat"],
     clearContext: [],
     compactContext: [],
+    interruptSession: [],
+    startSession: [],
+    restartSession: [],
     next: [],
     previous: [],
     focus1: ["focus 1"],
@@ -59,6 +68,9 @@ struct CommandPhrases: Equatable {
     newChat: [],
     clearContext: [],
     compactContext: [],
+    interruptSession: [],
+    startSession: [],
+    restartSession: [],
     next: [],
     previous: [],
     focus1: ["focus 1"],
@@ -77,6 +89,9 @@ struct CommandPhrases: Equatable {
       (.newChat, newChat),
       (.clearContext, clearContext),
       (.compactContext, compactContext),
+      (.interruptSession, interruptSession),
+      (.startSession, startSession),
+      (.restartSession, restartSession),
       (.nextItem, next),
       (.previousItem, previous),
     ] + positionalMappings
@@ -136,6 +151,9 @@ struct Configuration: Equatable {
     new_chat = ["new chat"]
     clear_context = ["clear context"]
     compact_context = ["compact context"]
+    interrupt_session = ["quit session"]
+    start_session = ["start session"]
+    restart_session = ["restart session"]
     next = ["focus next"]
     previous = ["focus previous", "focus prev"]
     focus_1 = ["focus 1"]
@@ -236,6 +254,9 @@ struct Configuration: Equatable {
       newChat: raw?.newChat ?? defaults.newChat,
       clearContext: raw?.clearContext ?? defaults.clearContext,
       compactContext: raw?.compactContext ?? defaults.compactContext,
+      interruptSession: raw?.interruptSession ?? defaults.interruptSession,
+      startSession: raw?.startSession ?? defaults.startSession,
+      restartSession: raw?.restartSession ?? defaults.restartSession,
       next: raw?.next ?? defaults.next,
       previous: raw?.previous ?? defaults.previous,
       focus1: raw?.focus1 ?? defaults.focus1,
@@ -298,6 +319,9 @@ struct Configuration: Equatable {
       commands.newChat = Self.normalizedPhrases(commands.newChat)
       commands.clearContext = Self.normalizedPhrases(commands.clearContext)
       commands.compactContext = Self.normalizedPhrases(commands.compactContext)
+      commands.interruptSession = Self.normalizedPhrases(commands.interruptSession)
+      commands.startSession = Self.normalizedPhrases(commands.startSession)
+      commands.restartSession = Self.normalizedPhrases(commands.restartSession)
       commands.next = Self.normalizedPhrases(commands.next)
       commands.previous = Self.normalizedPhrases(commands.previous)
       commands.focus1 = Self.normalizedPhrases(commands.focus1)
@@ -317,10 +341,13 @@ struct Configuration: Equatable {
         commands.next.isEmpty,
         commands.previous.isEmpty,
         commands.clearContext.isEmpty,
-        commands.compactContext.isEmpty
+        commands.compactContext.isEmpty,
+        commands.interruptSession.isEmpty,
+        commands.startSession.isEmpty,
+        commands.restartSession.isEmpty
       else {
         throw ConfigurationError(
-          "\(target.displayName) does not support context, next, or previous commands"
+          "\(target.displayName) does not support context, session, next, or previous commands"
         )
       }
     }
@@ -430,6 +457,9 @@ private struct RawCommandPhrases: Decodable {
   var newChat: [String]?
   var clearContext: [String]?
   var compactContext: [String]?
+  var interruptSession: [String]?
+  var startSession: [String]?
+  var restartSession: [String]?
   var next: [String]?
   var previous: [String]?
   var focus1: [String]?
@@ -447,6 +477,9 @@ private struct RawCommandPhrases: Decodable {
     case newChat = "new_chat"
     case clearContext = "clear_context"
     case compactContext = "compact_context"
+    case interruptSession = "interrupt_session"
+    case startSession = "start_session"
+    case restartSession = "restart_session"
     case focus1 = "focus_1"
     case focus2 = "focus_2"
     case focus3 = "focus_3"

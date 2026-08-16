@@ -5,6 +5,9 @@ enum ApplicationCommand: Equatable, Hashable {
   case newChat
   case clearContext
   case compactContext
+  case interruptSession
+  case startSession
+  case restartSession
   case focusItem(Int)
   case nextItem
   case previousItem

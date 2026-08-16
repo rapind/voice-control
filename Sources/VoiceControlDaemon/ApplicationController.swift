@@ -156,8 +156,26 @@ final class ApplicationController {
       )
       return
     }
-    if let slashCommand = slashCommandText(for: command, target: target) {
-      pasteAndSubmit(slashCommand, to: target, delay: 0, completion: completion)
+    if command == .restartSession {
+      guard let text = textToSubmit(for: command, target: target),
+        let keyStroke = keyStroke(for: command, target: target),
+        postKey(keyCode: keyStroke.keyCode, flags: keyStroke.flags)
+      else {
+        completion(.failure(InjectionError("Could not restart the Ghostty session")))
+        return
+      }
+      DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+        guard self.isFrontmostTarget(target, pid: targetPID) else {
+          completion(
+            .failure(InjectionError("\(target.displayName) is no longer the frontmost application")))
+          return
+        }
+        self.pasteAndSubmit(text, to: target, delay: 0, completion: completion)
+      }
+      return
+    }
+    if let text = textToSubmit(for: command, target: target) {
+      pasteAndSubmit(text, to: target, delay: 0, completion: completion)
       return
     }
     guard let keyStroke = keyStroke(for: command, target: target) else {
@@ -273,6 +291,11 @@ final class ApplicationController {
       }
     case .clearContext, .compactContext:
       return nil
+    case .interruptSession, .restartSession:
+      guard target == .ghostty else { return nil }
+      return (8, .maskControl)
+    case .startSession:
+      return nil
     case .focusItem(let number):
       let keyCodes: [Int: CGKeyCode] = [
         1: 18, 2: 19, 3: 20, 4: 21, 5: 23, 6: 22, 7: 26, 8: 28, 9: 25,
@@ -297,6 +320,19 @@ final class ApplicationController {
     switch command {
     case .clearContext: return "/clear"
     case .compactContext: return "/compact"
+    default: return nil
+    }
+  }
+
+  func textToSubmit(
+    for command: ApplicationCommand, target: ApplicationTarget
+  ) -> String? {
+    if let slashCommand = slashCommandText(for: command, target: target) {
+      return slashCommand
+    }
+    guard target == .ghostty else { return nil }
+    switch command {
+    case .startSession, .restartSession: return "omp"
     default: return nil
     }
   }

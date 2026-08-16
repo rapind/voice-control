@@ -95,6 +95,49 @@ import Testing
   )
 }
 
+@Test func GhosttySessionControlsAreOnlyRecognizedInGhostty() throws {
+  let configuration = try Configuration.decodeTOML(
+    Data(
+      """
+      [applications.ghostty.commands]
+      interrupt_session = ["quit session"]
+      start_session = ["start session"]
+      restart_session = ["restart session"]
+      """.utf8
+    )
+  )
+  let ghosttyMappings = configuration.commandMappings(for: .ghostty)
+
+  #expect(
+    ApplicationCommand.parse(
+      "quit session",
+      wakePhrases: configuration.wakePhrases,
+      mappings: ghosttyMappings
+    ) == .interruptSession
+  )
+  #expect(
+    ApplicationCommand.parse(
+      "start session",
+      wakePhrases: configuration.wakePhrases,
+      mappings: ghosttyMappings
+    ) == .startSession
+  )
+  #expect(
+    ApplicationCommand.parse(
+      "restart session",
+      wakePhrases: configuration.wakePhrases,
+      mappings: ghosttyMappings
+    ) == .restartSession
+  )
+  #expect(
+    ApplicationCommand.parse(
+      "restart session",
+      wakePhrases: configuration.wakePhrases,
+      mappings: configuration.commandMappings(for: .chatGPT)
+    ) == nil
+  )
+}
+
 @Test func unsupportedFrontmostApplicationConsumesSafeGlobalCommands() throws {
   let configuration = try Configuration.decodeTOML(Data())
   let mappings = configuration.commandMappings(for: nil)

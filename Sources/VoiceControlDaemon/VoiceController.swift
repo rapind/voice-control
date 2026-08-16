@@ -1,5 +1,6 @@
 import AppKit
 import Foundation
+import OSLog
 
 final class VoiceController {
   var onStateChanged: ((VoicePhase) -> Void)?
@@ -12,6 +13,10 @@ final class VoiceController {
   private let applicationController = ApplicationController()
   private let transcriber: PromptTranscriber
   private let liveAudioRouter = LiveAudioBufferRouter()
+  private let logger = Logger(
+    subsystem: "com.daverapin.voice-control-prototype",
+    category: "VoiceController"
+  )
   private var machine = VoiceStateMachine()
   private var modelReady = false
   private var voiceReady = false
@@ -23,6 +28,7 @@ final class VoiceController {
   private var ignoreSilenceUntil = Date()
   private var heardPromptSpeech = false
   private var silenceTimer: Timer?
+  private var audioHealthTimer: Timer?
   private var lastKeywordTranscript = ""
   private var preview = TranscriptPreview()
   private var pendingPreviewText = ""
@@ -81,6 +87,8 @@ final class VoiceController {
     silenceTimer?.invalidate()
     silenceTimer = nil
     keywords.stop()
+    audioHealthTimer?.invalidate()
+    audioHealthTimer = nil
     stopLiveTranscription()
     audio.stop()
   }
@@ -148,7 +156,9 @@ final class VoiceController {
       guard applyPendingConfiguration() else { return }
       lastKeywordTranscript = ""
       do {
+        try audio.start()
         try keywords.start()
+        startAudioHealthCheck()
       } catch {
         fail(error.localizedDescription)
       }
@@ -454,6 +464,32 @@ final class VoiceController {
     }
   }
 
+  private func startAudioHealthCheck() {
+    audioHealthTimer?.invalidate()
+    let timer = Timer(timeInterval: 5, repeats: true) { [weak self] _ in
+      guard
+        let self,
+        WakeListenerHealth.shouldRecover(
+          phase: self.machine.phase,
+          audioIsRunning: self.audio.isRunning
+        )
+      else {
+        return
+      }
+      self.logger.notice("Audio capture stopped; restarting wake listener")
+      self.keywords.stop()
+      self.lastKeywordTranscript = ""
+      do {
+        try self.audio.start()
+        try self.keywords.start()
+      } catch {
+        self.fail("Could not restore microphone listening: \(error.localizedDescription)")
+      }
+    }
+    RunLoop.main.add(timer, forMode: .common)
+    audioHealthTimer = timer
+  }
+
   private func applyPendingConfiguration() -> Bool {
     guard let updated = pendingConfiguration else { return true }
     do {
@@ -494,6 +530,8 @@ final class VoiceController {
     silenceTimer?.invalidate()
     silenceTimer = nil
     keywords.stop()
+    audioHealthTimer?.invalidate()
+    audioHealthTimer = nil
     stopLiveTranscription()
     _ = audio.finishRecording()
     dispatch(.failed(message))
@@ -518,5 +556,11 @@ final class VoiceController {
       "  silence fallback: \(configuration.silenceSeconds)s at \(configuration.silenceThresholdDB)dBFS"
     )
     print("  transcription: \(transcriber.name)")
+  }
+}
+
+enum WakeListenerHealth {
+  static func shouldRecover(phase: VoicePhase, audioIsRunning: Bool) -> Bool {
+    phase == .waitingForWake && !audioIsRunning
   }
 }

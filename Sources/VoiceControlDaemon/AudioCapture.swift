@@ -13,6 +13,8 @@ final class AudioCapture {
   private var totalCapturedTime: TimeInterval = 0
   private var tapInstalled = false
 
+  var isRunning: Bool { engine.isRunning }
+
   static func requestPermission(_ completion: @escaping (Bool) -> Void) {
     switch AVCaptureDevice.authorizationStatus(for: .audio) {
     case .authorized:

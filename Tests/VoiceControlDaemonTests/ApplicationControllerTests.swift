@@ -38,7 +38,6 @@ import Testing
   #expect(controlC.keyCode == 8)
   #expect(controlC.flags == .maskControl)
   #expect(controller.textToSubmit(for: .startSession, target: .ghostty) == "omp")
-  #expect(controller.textToSubmit(for: .restartSession, target: .ghostty) == "omp")
   #expect(controller.keyStroke(for: .interruptSession, target: .chrome) == nil)
   #expect(controller.textToSubmit(for: .startSession, target: .chrome) == nil)
 }

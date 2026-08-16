@@ -7,7 +7,6 @@ enum ApplicationCommand: Equatable, Hashable {
   case compactContext
   case interruptSession
   case startSession
-  case restartSession
   case focusItem(Int)
   case nextItem
   case previousItem

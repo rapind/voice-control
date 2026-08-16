@@ -102,7 +102,6 @@ import Testing
       [applications.ghostty.commands]
       interrupt_session = ["quit session"]
       start_session = ["start session"]
-      restart_session = ["restart session"]
       """.utf8
     )
   )
@@ -127,13 +126,6 @@ import Testing
       "restart session",
       wakePhrases: configuration.wakePhrases,
       mappings: ghosttyMappings
-    ) == .restartSession
-  )
-  #expect(
-    ApplicationCommand.parse(
-      "restart session",
-      wakePhrases: configuration.wakePhrases,
-      mappings: configuration.commandMappings(for: .chatGPT)
     ) == nil
   )
 }

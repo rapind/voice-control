@@ -156,6 +156,17 @@ final class ApplicationController {
       )
       return
     }
+    if command == .interruptSession {
+      do {
+        logger.notice("Sending Control-D to Ghostty")
+        try pressControlDUsingSystemEvents()
+        completion(.success(()))
+      } catch {
+        completion(.failure(error))
+      }
+      return
+    }
+
     if let text = textToSubmit(for: command, target: target) {
       pasteAndSubmit(text, to: target, delay: 0, completion: completion)
       return
@@ -273,10 +284,7 @@ final class ApplicationController {
       }
     case .clearContext, .compactContext:
       return nil
-    case .interruptSession:
-      guard target == .ghostty else { return nil }
-      return (8, .maskControl)
-    case .startSession:
+    case .interruptSession, .startSession:
       return nil
     case .focusItem(let number):
       let keyCodes: [Int: CGKeyCode] = [
@@ -333,20 +341,29 @@ final class ApplicationController {
     return true
   }
 
+  private func pressControlDUsingSystemEvents() throws {
+    try pressKeyUsingSystemEvents(keyCode: 2, modifier: "control down")
+  }
+
   private func pressReturnUsingSystemEvents() throws {
+    try pressKeyUsingSystemEvents(keyCode: 36)
+  }
+
+  private func pressKeyUsingSystemEvents(keyCode: Int, modifier: String? = nil) throws {
+    let modifierClause = modifier.map { " using \($0)" } ?? ""
     guard
       let script = NSAppleScript(
-        source: "tell application id \"com.apple.systemevents\" to key code 36"
+        source: "tell application id \"com.apple.systemevents\" to key code \(keyCode)\(modifierClause)"
       )
     else {
-      throw InjectionError("Could not create the Return key request")
+      throw InjectionError("Could not create the keyboard event request")
     }
     var errorInfo: NSDictionary?
     _ = script.executeAndReturnError(&errorInfo)
     if let errorInfo {
       let message =
         errorInfo[NSAppleScript.errorMessage] as? String
-        ?? "macOS rejected the Return key request"
+        ?? "macOS rejected the keyboard event request"
       throw InjectionError(message)
     }
   }

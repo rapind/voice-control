@@ -1,12 +1,16 @@
-# Voice Control Prototype
+# Voice Control
 
-This is throwaway code answering one question: can one small macOS process reliably own the complete voice transaction without wrapping Codex or interfering with the target application's rendering?
+Voice Control is a maintained private macOS tool for owning a complete voice transaction without wrapping OMP or interfering with the target application's rendering.
 
 The daemon listens for a wake phrase, captures the frontmost window without changing focus, shows a live transcription while recording, finalizes that transcript, and presses Return. It uses Apple Speech progressive transcription on macOS 26 and FluidAudio Parakeet on macOS 14 and 15.
 
+## Architecture decisions
+
+The current design constraints are recorded in [Architecture Decision Records](docs/adr/README.md).
+
 ## Before running
 
-1. On macOS 14 or 15, load Parakeet once in TypeWhisper. The prototype reuses the model files already stored in FluidAudio's shared cache. TypeWhisper does not need to remain open. On macOS 26, the app installs and uses Apple's on-device `en-US` speech asset.
+1. On macOS 14 or 15, load Parakeet once in TypeWhisper. The tool reuses the model files already stored in FluidAudio's shared cache. TypeWhisper does not need to remain open. On macOS 26, the app installs and uses Apple's on-device `en-US` speech asset.
 2. Run Ghostty, ChatGPT, or Google Chrome when you want to use their application shortcuts.
 
 ## Run the installed app
@@ -128,7 +132,7 @@ All other speech remains a normal prompt. On macOS 26, Apple progressive results
 
 The configured submit phrase creates an audio cutoff. The phrase itself and anything spoken after it are excluded from final transcription. Say a configured cancel phrase to clear the live preview, discard the recording, and return to wake listening without submitting.
 
-## Prototype limits
+## Operational limits
 
 - Dictation stays bound to the window captured at wake time. Changing windows during recording stops live typing rather than redirecting text.
 - Apple Speech preview results may revise earlier words until stream finalization. The Parakeet fallback updates about every 1.5 seconds and replaces its preview with the final full-context pass.
@@ -137,4 +141,3 @@ The configured submit phrase creates an audio cutoff. The phrase itself and anyt
 - Silence detection uses a configurable RMS threshold, not a neural VAD.
 - The app is ad-hoc signed with a stable identifier-only designated requirement. This avoids a paid Apple developer account and should preserve Accessibility approval across local rebuilds. It is appropriate for this private local tool, but weaker than certificate-backed signing because another local app using the same bundle identifier could satisfy the requirement.
 
-Delete or replace this prototype after the interaction model has been tested.

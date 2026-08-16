@@ -52,6 +52,8 @@ maximum_recording_seconds = 90
 [applications.ghostty.commands]
 focus = ["focus ghost tee"]
 new_chat = ["new chat"]
+clear_context = ["clear context"]
+compact_context = ["compact context"]
 next = ["focus next"]
 previous = ["focus previous", "focus prev"]
 focus_1 = ["focus 1"]
@@ -94,7 +96,7 @@ Save the file and the app applies valid changes within about one second. You do 
 
 The wake phrase starts recording without changing focus. Dictation is bound to whichever window was frontmost when recording started. Direct focus phrases are global: `focus ghost tee`, `focus chat`, and `focus chrome`.
 
-Other commands use the supported application that was frontmost at wake time. `focus 1` sends Command+1 only when Ghostty, ChatGPT, or Chrome was frontmost. If another application was frontmost, the phrase is consumed without sending a keyboard shortcut.
+Other commands use the supported application that was frontmost at wake time. In Ghostty, `focus 1` sends Control+Option+1 for direct Herdr workspace switching. In ChatGPT and Chrome, it sends Command+1. If another application was frontmost, the phrase is consumed without sending a keyboard shortcut.
 
 Use another configuration file when launching if needed:
 
@@ -115,7 +117,7 @@ Ghostty, ChatGPT, and Chrome support:
 - `focus 1` through `focus 9`
 - Their global application focus phrase
 
-For Ghostty, `new chat` opens a new tab, types `codex`, and presses Return. Ghostty also supports `focus next` and `focus previous`. For ChatGPT, `new chat` sends Command-N. Chrome does not define a `new chat` command. Numbered focus commands send Command-1 through Command-9 to the captured supported application.
+For Ghostty, `new chat` opens a new tab, types `codex`, and presses Return. `clear context` sends `/clear`, and `compact context` sends `/compact`; both press Return. Ghostty also supports `focus next` and `focus previous`. Numbered focus commands send Control+Option+1 through Control+Option+9, matching the recommended Herdr workspace bindings. For ChatGPT, `new chat` sends Command-N. Chrome does not define a `new chat` command. Numbered focus commands in ChatGPT and Chrome send Command-1 through Command-9.
 
 All other speech remains a normal prompt. On macOS 26, Apple progressive results revise the visible text while recording and finalize through the end of the same audio stream. On macOS 14 and 15, rolling full-context Parakeet passes provide the preview and a final file pass remains authoritative.
 

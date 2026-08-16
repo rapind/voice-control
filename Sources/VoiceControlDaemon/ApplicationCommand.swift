@@ -3,6 +3,8 @@ import Foundation
 enum ApplicationCommand: Equatable, Hashable {
   case focus(ApplicationTarget)
   case newChat
+  case clearContext
+  case compactContext
   case focusItem(Int)
   case nextItem
   case previousItem

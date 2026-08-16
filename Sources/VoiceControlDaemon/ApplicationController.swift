@@ -156,6 +156,10 @@ final class ApplicationController {
       )
       return
     }
+    if let slashCommand = slashCommandText(for: command, target: target) {
+      pasteAndSubmit(slashCommand, to: target, delay: 0, completion: completion)
+      return
+    }
     guard let keyStroke = keyStroke(for: command, target: target) else {
       completion(.failure(InjectionError("Unsupported \(target.displayName) command")))
       return
@@ -255,7 +259,7 @@ final class ApplicationController {
     return NSWorkspace.shared.frontmostApplication?.processIdentifier == pid
   }
 
-  private func keyStroke(for command: ApplicationCommand, target: ApplicationTarget) -> (
+  func keyStroke(for command: ApplicationCommand, target: ApplicationTarget) -> (
     keyCode: CGKeyCode, flags: CGEventFlags
   )? {
     switch command {
@@ -267,18 +271,33 @@ final class ApplicationController {
       case .chatGPT: return (45, .maskCommand)
       case .chrome: return nil
       }
+    case .clearContext, .compactContext:
+      return nil
     case .focusItem(let number):
       let keyCodes: [Int: CGKeyCode] = [
         1: 18, 2: 19, 3: 20, 4: 21, 5: 23, 6: 22, 7: 26, 8: 28, 9: 25,
       ]
       guard let keyCode = keyCodes[number] else { return nil }
-      return (keyCode, .maskCommand)
+      let flags: CGEventFlags =
+        target == .ghostty ? [.maskControl, .maskAlternate] : .maskCommand
+      return (keyCode, flags)
     case .nextItem:
       guard target == .ghostty else { return nil }
       return (30, [.maskCommand, .maskShift])
     case .previousItem:
       guard target == .ghostty else { return nil }
       return (33, [.maskCommand, .maskShift])
+    }
+  }
+
+  func slashCommandText(
+    for command: ApplicationCommand, target: ApplicationTarget
+  ) -> String? {
+    guard target == .ghostty else { return nil }
+    switch command {
+    case .clearContext: return "/clear"
+    case .compactContext: return "/compact"
+    default: return nil
     }
   }
 

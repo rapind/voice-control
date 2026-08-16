@@ -4,6 +4,8 @@ import TOMLDecoder
 struct CommandPhrases: Equatable {
   var focus: [String]
   var newChat: [String]
+  var clearContext: [String]
+  var compactContext: [String]
   var next: [String]
   var previous: [String]
   var focus1: [String]
@@ -19,6 +21,8 @@ struct CommandPhrases: Equatable {
   static let ghosttyDefaults = CommandPhrases(
     focus: ["focus ghost tee"],
     newChat: ["new chat"],
+    clearContext: ["clear context"],
+    compactContext: ["compact context"],
     next: ["focus next"],
     previous: ["focus previous", "focus prev"],
     focus1: ["focus 1"],
@@ -35,6 +39,8 @@ struct CommandPhrases: Equatable {
   static let chatGPTDefaults = CommandPhrases(
     focus: ["focus chat"],
     newChat: ["new chat"],
+    clearContext: [],
+    compactContext: [],
     next: [],
     previous: [],
     focus1: ["focus 1"],
@@ -51,6 +57,8 @@ struct CommandPhrases: Equatable {
   static let chromeDefaults = CommandPhrases(
     focus: ["focus chrome"],
     newChat: [],
+    clearContext: [],
+    compactContext: [],
     next: [],
     previous: [],
     focus1: ["focus 1"],
@@ -67,6 +75,8 @@ struct CommandPhrases: Equatable {
   var nonFocusMappings: [(ApplicationCommand, [String])] {
     [
       (.newChat, newChat),
+      (.clearContext, clearContext),
+      (.compactContext, compactContext),
       (.nextItem, next),
       (.previousItem, previous),
     ] + positionalMappings
@@ -124,6 +134,8 @@ struct Configuration: Equatable {
     [applications.ghostty.commands]
     focus = ["focus ghost tee"]
     new_chat = ["new chat"]
+    clear_context = ["clear context"]
+    compact_context = ["compact context"]
     next = ["focus next"]
     previous = ["focus previous", "focus prev"]
     focus_1 = ["focus 1"]
@@ -222,6 +234,8 @@ struct Configuration: Equatable {
     CommandPhrases(
       focus: raw?.focus ?? defaults.focus,
       newChat: raw?.newChat ?? defaults.newChat,
+      clearContext: raw?.clearContext ?? defaults.clearContext,
+      compactContext: raw?.compactContext ?? defaults.compactContext,
       next: raw?.next ?? defaults.next,
       previous: raw?.previous ?? defaults.previous,
       focus1: raw?.focus1 ?? defaults.focus1,
@@ -282,6 +296,8 @@ struct Configuration: Equatable {
       var commands = applicationCommands[target]!
       commands.focus = Self.normalizedPhrases(commands.focus)
       commands.newChat = Self.normalizedPhrases(commands.newChat)
+      commands.clearContext = Self.normalizedPhrases(commands.clearContext)
+      commands.compactContext = Self.normalizedPhrases(commands.compactContext)
       commands.next = Self.normalizedPhrases(commands.next)
       commands.previous = Self.normalizedPhrases(commands.previous)
       commands.focus1 = Self.normalizedPhrases(commands.focus1)
@@ -297,9 +313,14 @@ struct Configuration: Equatable {
     }
     for target in [ApplicationTarget.chatGPT, .chrome] {
       let commands = applicationCommands[target]!
-      guard commands.next.isEmpty, commands.previous.isEmpty else {
+      guard
+        commands.next.isEmpty,
+        commands.previous.isEmpty,
+        commands.clearContext.isEmpty,
+        commands.compactContext.isEmpty
+      else {
         throw ConfigurationError(
-          "\(target.displayName) does not support next or previous commands; use focus_1 through focus_9"
+          "\(target.displayName) does not support context, next, or previous commands"
         )
       }
     }
@@ -407,6 +428,8 @@ private struct RawApplication: Decodable {
 private struct RawCommandPhrases: Decodable {
   var focus: [String]?
   var newChat: [String]?
+  var clearContext: [String]?
+  var compactContext: [String]?
   var next: [String]?
   var previous: [String]?
   var focus1: [String]?
@@ -422,6 +445,8 @@ private struct RawCommandPhrases: Decodable {
   enum CodingKeys: String, CodingKey {
     case focus, next, previous
     case newChat = "new_chat"
+    case clearContext = "clear_context"
+    case compactContext = "compact_context"
     case focus1 = "focus_1"
     case focus2 = "focus_2"
     case focus3 = "focus_3"

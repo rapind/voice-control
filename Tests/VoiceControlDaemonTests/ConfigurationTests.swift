@@ -296,6 +296,33 @@ import Testing
   )
 }
 
+@Test func parsesGhosttyContextCommandsAfterWakePhrase() throws {
+  let configuration = try Configuration.decodeTOML(Data())
+  let mappings = configuration.commandMappings(for: .ghostty)
+
+  #expect(
+    ApplicationCommand.parse(
+      "Computer, clear context",
+      wakePhrases: ["computer"],
+      mappings: mappings
+    ) == .clearContext
+  )
+  #expect(
+    ApplicationCommand.parse(
+      "Computer, compact context",
+      wakePhrases: ["computer"],
+      mappings: mappings
+    ) == .compactContext
+  )
+  #expect(
+    ApplicationCommand.parse(
+      "Computer, clear context",
+      wakePhrases: ["computer"],
+      mappings: configuration.commandMappings(for: .chrome)
+    ) == nil
+  )
+}
+
 @Test func cleansConfiguredWakeAndSubmitAliases() {
   #expect(
     PhraseMatcher.cleanFinalTranscript(

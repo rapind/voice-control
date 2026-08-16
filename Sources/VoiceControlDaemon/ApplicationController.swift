@@ -150,6 +150,7 @@ final class ApplicationController {
       }
       pasteAndSubmit(
         "codex",
+        command: command,
         to: target,
         delay: 0.6,
         completion: completion
@@ -168,7 +169,7 @@ final class ApplicationController {
     }
 
     if let text = textToSubmit(for: command, target: target) {
-      pasteAndSubmit(text, to: target, delay: 0, completion: completion)
+      pasteAndSubmit(text, command: command, to: target, delay: 0, completion: completion)
       return
     }
     guard let keyStroke = keyStroke(for: command, target: target) else {
@@ -284,7 +285,7 @@ final class ApplicationController {
       }
     case .clearContext, .compactContext:
       return nil
-    case .interruptSession, .startSession, .shareSession:
+    case .interruptSession, .startSession, .shareSession, .stopSharing:
       return nil
     case .focusItem(let number):
       let keyCodes: [Int: CGKeyCode] = [
@@ -305,6 +306,7 @@ final class ApplicationController {
     case .clearContext: return "/clear"
     case .compactContext: return "/compact"
     case .shareSession: return "/collab"
+    case .stopSharing: return "/collab stop"
     default: return nil
     }
   }
@@ -383,6 +385,7 @@ final class ApplicationController {
 
   private func pasteAndSubmit(
     _ text: String,
+    command: ApplicationCommand,
     to target: ApplicationTarget,
     delay: TimeInterval,
     completion: @escaping (Result<Void, Error>) -> Void
@@ -404,17 +407,31 @@ final class ApplicationController {
       DispatchQueue.main.asyncAfter(
         deadline: .now() + SubmissionTiming.returnDelay(for: text)
       ) {
-        do {
-          try self.pressReturnUsingSystemEvents()
-        } catch {
-          self.restorePasteboard(pasteboard, items: savedItems)
-          completion(.failure(error))
-          return
+        func complete() {
+          DispatchQueue.main.asyncAfter(deadline: .now() + 0.75) {
+            self.restorePasteboard(pasteboard, items: savedItems)
+          }
+          completion(.success(()))
         }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.75) {
-          self.restorePasteboard(pasteboard, items: savedItems)
+
+        func sendReturn(_ remaining: Int) {
+          do {
+            try self.pressReturnUsingSystemEvents()
+          } catch {
+            self.restorePasteboard(pasteboard, items: savedItems)
+            completion(.failure(error))
+            return
+          }
+          guard remaining > 1 else {
+            complete()
+            return
+          }
+          DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+            sendReturn(remaining - 1)
+          }
         }
-        completion(.success(()))
+
+        sendReturn(SubmissionTiming.returnCount(for: command))
       }
     }
   }
@@ -442,6 +459,10 @@ final class ApplicationController {
 enum SubmissionTiming {
   static func returnDelay(for text: String) -> TimeInterval {
     min(3, max(0.75, 0.5 + Double(text.utf16.count) / 200))
+  }
+
+  static func returnCount(for command: ApplicationCommand) -> Int {
+    command == .stopSharing ? 2 : 1
   }
 }
 

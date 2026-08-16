@@ -9,6 +9,7 @@ struct CommandPhrases: Equatable {
   var interruptSession: [String]
   var startSession: [String]
   var shareSession: [String]
+  var stopSharing: [String]
   var focus1: [String]
   var focus2: [String]
   var focus3: [String]
@@ -27,6 +28,7 @@ struct CommandPhrases: Equatable {
     interruptSession: ["quit session"],
     startSession: ["start session"],
     shareSession: ["share session"],
+    stopSharing: ["stop sharing"],
     focus1: ["focus one"],
     focus2: ["focus two"],
     focus3: ["focus three"],
@@ -46,6 +48,7 @@ struct CommandPhrases: Equatable {
     interruptSession: [],
     startSession: [],
     shareSession: [],
+    stopSharing: [],
     focus1: ["focus one"],
     focus2: ["focus two"],
     focus3: ["focus three"],
@@ -65,6 +68,7 @@ struct CommandPhrases: Equatable {
     interruptSession: [],
     startSession: [],
     shareSession: [],
+    stopSharing: [],
     focus1: ["focus one"],
     focus2: ["focus two"],
     focus3: ["focus three"],
@@ -84,6 +88,7 @@ struct CommandPhrases: Equatable {
       (.interruptSession, interruptSession),
       (.startSession, startSession),
       (.shareSession, shareSession),
+      (.stopSharing, stopSharing),
     ] + positionalMappings
   }
 
@@ -147,6 +152,7 @@ struct Configuration: Equatable {
     interrupt_session = ["quit session"]
     start_session = ["start session"]
     share_session = ["share session"]
+    stop_sharing = ["stop sharing"]
     focus_1 = ["focus one"]
     focus_2 = ["focus two"]
     focus_3 = ["focus three"]
@@ -249,6 +255,7 @@ struct Configuration: Equatable {
       interruptSession: raw?.interruptSession ?? defaults.interruptSession,
       startSession: raw?.startSession ?? defaults.startSession,
       shareSession: raw?.shareSession ?? defaults.shareSession,
+      stopSharing: raw?.stopSharing ?? defaults.stopSharing,
       focus1: raw?.focus1 ?? defaults.focus1,
       focus2: raw?.focus2 ?? defaults.focus2,
       focus3: raw?.focus3 ?? defaults.focus3,
@@ -313,6 +320,7 @@ struct Configuration: Equatable {
       commands.interruptSession = Self.normalizedPhrases(commands.interruptSession)
       commands.startSession = Self.normalizedPhrases(commands.startSession)
       commands.shareSession = Self.normalizedPhrases(commands.shareSession)
+      commands.stopSharing = Self.normalizedPhrases(commands.stopSharing)
       commands.focus1 = Self.normalizedPhrases(commands.focus1)
       commands.focus2 = Self.normalizedPhrases(commands.focus2)
       commands.focus3 = Self.normalizedPhrases(commands.focus3)
@@ -331,7 +339,8 @@ struct Configuration: Equatable {
         commands.compactContext.isEmpty,
         commands.interruptSession.isEmpty,
         commands.startSession.isEmpty,
-        commands.shareSession.isEmpty
+        commands.shareSession.isEmpty,
+        commands.stopSharing.isEmpty
       else {
         throw ConfigurationError(
           "\(target.displayName) does not support context or session commands"
@@ -448,6 +457,7 @@ private struct RawCommandPhrases: Decodable {
   var interruptSession: [String]?
   var startSession: [String]?
   var shareSession: [String]?
+  var stopSharing: [String]?
   var focus1: [String]?
   var focus2: [String]?
   var focus3: [String]?
@@ -466,6 +476,7 @@ private struct RawCommandPhrases: Decodable {
     case interruptSession = "interrupt_session"
     case startSession = "start_session"
     case shareSession = "share_session"
+    case stopSharing = "stop_sharing"
     case focus1 = "focus_1"
     case focus2 = "focus_2"
     case focus3 = "focus_3"

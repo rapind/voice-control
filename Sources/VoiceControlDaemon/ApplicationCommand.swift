@@ -8,6 +8,7 @@ enum ApplicationCommand: Equatable, Hashable {
   case interruptSession
   case startSession
   case shareSession
+  case stopSharing
   case focusItem(Int)
 
   var focusTarget: ApplicationTarget? {

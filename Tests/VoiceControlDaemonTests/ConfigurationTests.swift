@@ -103,6 +103,7 @@ import Testing
       interrupt_session = ["quit session"]
       start_session = ["start session"]
       share_session = ["share session"]
+      stop_sharing = ["stop sharing"]
       """.utf8
     )
   )
@@ -128,6 +129,13 @@ import Testing
       wakePhrases: configuration.wakePhrases,
       mappings: ghosttyMappings
     ) == .shareSession
+  )
+  #expect(
+    ApplicationCommand.parse(
+      "stop sharing",
+      wakePhrases: configuration.wakePhrases,
+      mappings: ghosttyMappings
+    ) == .stopSharing
   )
   #expect(
     ApplicationCommand.parse(
@@ -524,6 +532,10 @@ import Testing
   #expect(SubmissionTiming.returnDelay(for: String(repeating: "a", count: 50)) == 0.75)
   #expect(SubmissionTiming.returnDelay(for: String(repeating: "a", count: 300)) == 2.0)
   #expect(SubmissionTiming.returnDelay(for: String(repeating: "a", count: 1_000)) == 3.0)
+}
+
+@Test func selectsAndExecutesOMPCollaborationStopCommand() {
+  #expect(SubmissionTiming.returnCount(for: .stopSharing) == 2)
 }
 
 @Test func reloadsChangedFileAndKeepsLastGoodConfigurationAfterAnError() throws {

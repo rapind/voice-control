@@ -13,6 +13,7 @@ protocol PromptTranscriberBackend: Sendable {
   ) async throws
   func stopLiveTranscription() async
   func transcribe(fileURL: URL) async throws -> String
+  func updateContextualStrings(_ contextualStrings: [String]) async
 }
 
 final class PromptTranscriber {
@@ -20,9 +21,9 @@ final class PromptTranscriber {
 
   private let backend: any PromptTranscriberBackend
 
-  init() {
+  init(contextualStrings: [String]) {
     if #available(macOS 26.0, *) {
-      let backend = AppleSpeechTranscriber()
+      let backend = AppleSpeechTranscriber(contextualStrings: contextualStrings)
       self.backend = backend
       self.name = backend.name
     } else {
@@ -34,6 +35,10 @@ final class PromptTranscriber {
 
   func prepare() async throws {
     try await backend.prepare()
+  }
+
+  func updateContextualStrings(_ contextualStrings: [String]) async {
+    await backend.updateContextualStrings(contextualStrings)
   }
 
   func startLiveTranscription(
@@ -84,6 +89,8 @@ actor ParakeetTranscriber: PromptTranscriberBackend {
     self.models = models
     self.manager = manager
   }
+
+  func updateContextualStrings(_ contextualStrings: [String]) async {}
 
   func startLiveTranscription(
     input: LiveAudioBufferSink,

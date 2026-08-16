@@ -44,6 +44,7 @@ The current setup is:
 wake = ["pewter", "pooter", "pyewter", "computer"]
 submit = ["send it", "sent it"]
 cancel = ["cancel it"]
+vocabulary = ["bean"]
 
 silence_seconds = 4
 silence_threshold_db = -45
@@ -95,6 +96,8 @@ focus_9 = ["focus 9"]
 ```
 
 Save the file and the app applies valid changes within about one second. You do not need to rebuild or restart it. Invalid TOML leaves the last working configuration active and shows a config error in the menu. Older `target` settings are accepted but no longer control routing.
+
+`vocabulary` lists words and short phrases to bias Apple Speech toward during dictation. It is a recognition hint, not a replacement rule, so adding `bean` does not turn legitimate uses of `being` into `bean`.
 
 The wake phrase starts recording without changing focus. Dictation is bound to whichever window was frontmost when recording started. Direct focus phrases are global: `focus ghost tee`, `focus chat`, and `focus chrome`.
 

@@ -112,6 +112,7 @@ struct Configuration: Equatable {
   var wakePhrases: [String]
   var submitPhrases: [String]
   var cancelPhrases: [String]
+  var vocabulary: [String]
   var silenceSeconds: TimeInterval
   var silenceThresholdDB: Float
   var maximumRecordingSeconds: TimeInterval
@@ -121,6 +122,7 @@ struct Configuration: Equatable {
     wakePhrases: ["ghostee", "ghostty", "ghostie", "ghosty", "ghost tea"],
     submitPhrases: ["ghost it"],
     cancelPhrases: ["ghost cancel"],
+    vocabulary: [],
     silenceSeconds: 4,
     silenceThresholdDB: -45,
     maximumRecordingSeconds: 90,
@@ -136,6 +138,7 @@ struct Configuration: Equatable {
     wake = ["ghostee", "ghostty", "ghostie", "ghosty", "ghost tea"]
     submit = ["ghost it"]
     cancel = ["ghost cancel"]
+    vocabulary = []
 
     silence_seconds = 4
     silence_threshold_db = -45
@@ -194,7 +197,7 @@ struct Configuration: Equatable {
   var contextualPhrases: [String] {
     var seen: Set<String> = []
     let phrases =
-      wakePhrases + submitPhrases + cancelPhrases
+      wakePhrases + submitPhrases + cancelPhrases + vocabulary
       + ApplicationTarget.allCases.flatMap { commandMappings(for: $0).flatMap(\.1) }
     return phrases.filter { seen.insert(PhraseMatcher.normalize($0)).inserted }
   }
@@ -217,6 +220,7 @@ struct Configuration: Equatable {
       wakePhrases: raw.wake ?? defaults.wakePhrases,
       submitPhrases: raw.submit ?? defaults.submitPhrases,
       cancelPhrases: raw.cancel ?? defaults.cancelPhrases,
+      vocabulary: raw.vocabulary ?? defaults.vocabulary,
       silenceSeconds: raw.silenceSeconds ?? defaults.silenceSeconds,
       silenceThresholdDB: Float(raw.silenceThresholdDB ?? Double(defaults.silenceThresholdDB)),
       maximumRecordingSeconds: raw.maximumRecordingSeconds
@@ -305,6 +309,7 @@ struct Configuration: Equatable {
     wakePhrases = try Self.controlPhrases(wakePhrases, name: "wake")
     submitPhrases = try Self.controlPhrases(submitPhrases, name: "submit")
     cancelPhrases = try Self.controlPhrases(cancelPhrases, name: "cancel")
+    vocabulary = Self.normalizedPhrases(vocabulary)
 
     for target in ApplicationTarget.allCases {
       var commands = applicationCommands[target]!
@@ -413,6 +418,7 @@ private struct RawConfiguration: Decodable {
   var wake: [String]?
   var submit: [String]?
   var cancel: [String]?
+  var vocabulary: [String]?
   var silenceSeconds: Double?
   var silenceThresholdDB: Double?
   var maximumRecordingSeconds: Double?
@@ -420,7 +426,7 @@ private struct RawConfiguration: Decodable {
   var commands: RawCommandPhrases?
 
   enum CodingKeys: String, CodingKey {
-    case target, wake, submit, cancel, applications, commands
+    case target, wake, submit, cancel, vocabulary, applications, commands
     case silenceSeconds = "silence_seconds"
     case silenceThresholdDB = "silence_threshold_db"
     case maximumRecordingSeconds = "maximum_recording_seconds"

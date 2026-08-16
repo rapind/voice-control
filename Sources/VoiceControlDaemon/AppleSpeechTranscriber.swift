@@ -8,6 +8,7 @@ actor AppleSpeechTranscriber: PromptTranscriberBackend {
 
   private var locale: Locale?
   private var analyzer: SpeechAnalyzer?
+  private var contextualStrings: [String]
   private var liveInput: LiveAudioBufferSink?
   private var inputBuilder: AsyncStream<AnalyzerInput>.Continuation?
   private var feederTask: Task<Void, Never>?
@@ -16,6 +17,10 @@ actor AppleSpeechTranscriber: PromptTranscriberBackend {
   private var volatileText = ""
   private var liveError: (any Error)?
   private var generation = 0
+
+  init(contextualStrings: [String]) {
+    self.contextualStrings = contextualStrings
+  }
 
   func prepare() async throws {
     guard SpeechTranscriber.isAvailable else {
@@ -55,6 +60,9 @@ actor AppleSpeechTranscriber: PromptTranscriberBackend {
     liveError = nil
     let transcriber = SpeechTranscriber(locale: locale, preset: .progressiveTranscription)
     let analyzer = SpeechAnalyzer(modules: [transcriber])
+    let context = AnalysisContext()
+    context.contextualStrings[.general] = contextualStrings
+    try await analyzer.setContext(context)
     guard
       let analyzerFormat = await SpeechAnalyzer.bestAvailableAudioFormat(
         compatibleWith: [transcriber]
@@ -122,6 +130,10 @@ actor AppleSpeechTranscriber: PromptTranscriberBackend {
       await stopLiveTranscription()
       throw error
     }
+  }
+
+  func updateContextualStrings(_ contextualStrings: [String]) async {
+    self.contextualStrings = contextualStrings
   }
 
   func stopLiveTranscription() async {

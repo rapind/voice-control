@@ -10,7 +10,7 @@ final class VoiceController {
   private let audio = AudioCapture()
   private let keywords: KeywordListener
   private let applicationController = ApplicationController()
-  private let transcriber = PromptTranscriber()
+  private let transcriber: PromptTranscriber
   private let liveAudioRouter = LiveAudioBufferRouter()
   private var machine = VoiceStateMachine()
   private var modelReady = false
@@ -30,6 +30,7 @@ final class VoiceController {
 
   init(configuration: Configuration) {
     self.configuration = configuration
+    self.transcriber = PromptTranscriber(contextualStrings: configuration.contextualPhrases)
     self.keywords = KeywordListener(contextualStrings: configuration.contextualPhrases)
 
     audio.onBuffer = { [weak self] buffer, startTime in
@@ -434,6 +435,9 @@ final class VoiceController {
     do {
       try keywords.updateContextualStrings(updated.contextualPhrases)
       configuration = updated
+      Task { [transcriber] in
+        await transcriber.updateContextualStrings(updated.contextualPhrases)
+      }
       pendingConfiguration = nil
       printConfiguration()
       onConfigurationChanged?(updated)

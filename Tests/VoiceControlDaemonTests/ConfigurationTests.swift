@@ -138,6 +138,7 @@ import Testing
     ApplicationCommand.parse(
       "focus chat",
       wakePhrases: configuration.wakePhrases,
+
       mappings: mappings
     ) == .focus(.chatGPT)
   )
@@ -148,6 +149,14 @@ import Testing
       mappings: mappings
     ) == .focusItem(1)
   )
+}
+
+@Test func vocabularyTermsJoinSpeechContext() throws {
+  let configuration = try Configuration.decodeTOML(
+    Data("vocabulary = [\"bean\"]".utf8)
+  )
+
+  #expect(configuration.contextualPhrases.contains("bean"))
 }
 
 @Test func chromeSupportsGlobalFocusAndPositionalCommands() throws {

@@ -16,4 +16,19 @@ codesign --force --sign - \
   --requirements '=designated => identifier "com.daverapin.voice-control-prototype"' \
   "$app_dir" >/dev/null
 
-exec open --wait-apps --new "$app_dir" --args "$@"
+if pgrep -x VoiceControlDaemon >/dev/null; then
+  pkill -TERM -x VoiceControlDaemon
+  for _ in {1..50}; do
+    if ! pgrep -x VoiceControlDaemon >/dev/null; then
+      break
+    fi
+    sleep 0.1
+  done
+fi
+
+if pgrep -x VoiceControlDaemon >/dev/null; then
+  echo "VoiceControlDaemon did not stop; refusing to launch a duplicate" >&2
+  exit 1
+fi
+
+exec open --wait-apps "$app_dir" --args "$@"

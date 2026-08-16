@@ -7,7 +7,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
   private var statusItem: NSStatusItem?
   private let stateMenuItem = NSMenuItem(title: "Starting", action: nil, keyEquivalent: "")
   private let wakeMenuItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
-  private let targetMenuItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
+  private let routingMenuItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
   private let submitMenuItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
   private let cancelMenuItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
   private let configStatusMenuItem = NSMenuItem(
@@ -61,12 +61,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     let menu = NSMenu()
     stateMenuItem.isEnabled = false
     wakeMenuItem.isEnabled = false
-    targetMenuItem.isEnabled = false
+    routingMenuItem.isEnabled = false
     submitMenuItem.isEnabled = false
     cancelMenuItem.isEnabled = false
     configStatusMenuItem.isEnabled = false
     menu.addItem(stateMenuItem)
-    menu.addItem(targetMenuItem)
+    menu.addItem(routingMenuItem)
     menu.addItem(wakeMenuItem)
     menu.addItem(submitMenuItem)
     menu.addItem(cancelMenuItem)
@@ -86,7 +86,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
   }
 
   private func updateConfigurationMenu(_ configuration: Configuration) {
-    targetMenuItem.title = "Target: \(configuration.target.displayName)"
+    routingMenuItem.title = "Routing: frontmost application"
     wakeMenuItem.title = "Wake: \(configuration.wakePhrases.joined(separator: ", "))"
     submitMenuItem.title = "Submit: \(configuration.submitPhrases.joined(separator: ", "))"
     cancelMenuItem.title = "Cancel: \(configuration.cancelPhrases.joined(separator: ", "))"

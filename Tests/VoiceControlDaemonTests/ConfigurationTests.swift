@@ -4,7 +4,7 @@ import Testing
 
 @testable import VoiceControlDaemon
 
-@Test func decodesChatGPTAsActiveTarget() throws {
+@Test func acceptsLegacyTargetSetting() throws {
   let configuration = try Configuration.decodeTOML(
     Data(
       """
@@ -13,10 +13,10 @@ import Testing
     )
   )
 
-  #expect(configuration.target == .chatGPT)
+  #expect(!configuration.commandMappings(for: .chatGPT).isEmpty)
 }
 
-@Test func onlyActiveTargetCommandsAreParsed() throws {
+@Test func onlyFrontmostTargetCommandsAreParsed() throws {
   let configuration = try Configuration.decodeTOML(
     Data(
       """
@@ -37,23 +37,136 @@ import Testing
     ApplicationCommand.parse(
       "open app chat",
       wakePhrases: configuration.wakePhrases,
-      commands: configuration.activeCommands
+      mappings: configuration.commandMappings(for: .chatGPT)
     ) == .newChat
   )
   #expect(
     ApplicationCommand.parse(
       "open terminal chat",
       wakePhrases: configuration.wakePhrases,
-      commands: configuration.activeCommands
+      mappings: configuration.commandMappings(for: .chatGPT)
     ) == nil
   )
   #expect(
     ApplicationCommand.parse(
       "focus 1",
       wakePhrases: configuration.wakePhrases,
-      commands: configuration.activeCommands
+      mappings: configuration.commandMappings(for: .chatGPT)
     ) == .focusItem(1)
   )
+  #expect(
+    ApplicationCommand.parse(
+      "focus ghost tee",
+      wakePhrases: configuration.wakePhrases,
+      mappings: configuration.commandMappings(for: .chatGPT)
+    ) == .focus(.ghostty)
+  )
+}
+
+@Test func commandsFollowFrontmostTargetInsteadOfConfiguredTarget() throws {
+  let configuration = try Configuration.decodeTOML(
+    Data(
+      """
+      target = "chatgpt"
+
+      [applications.ghostty.commands]
+      new_chat = ["open terminal chat"]
+
+      [applications.chatgpt.commands]
+      new_chat = ["open app chat"]
+      """.utf8
+    )
+  )
+  let mappings = configuration.commandMappings(for: .ghostty)
+
+  #expect(
+    ApplicationCommand.parse(
+      "open terminal chat",
+      wakePhrases: configuration.wakePhrases,
+      mappings: mappings
+    ) == .newChat
+  )
+  #expect(
+    ApplicationCommand.parse(
+      "open app chat",
+      wakePhrases: configuration.wakePhrases,
+      mappings: mappings
+    ) == nil
+  )
+}
+
+@Test func unsupportedFrontmostApplicationConsumesSafeGlobalCommands() throws {
+  let configuration = try Configuration.decodeTOML(Data())
+  let mappings = configuration.commandMappings(for: nil)
+
+  #expect(
+    ApplicationCommand.parse(
+      "focus chat",
+      wakePhrases: configuration.wakePhrases,
+      mappings: mappings
+    ) == .focus(.chatGPT)
+  )
+  #expect(
+    ApplicationCommand.parse(
+      "focus 1",
+      wakePhrases: configuration.wakePhrases,
+      mappings: mappings
+    ) == .focusItem(1)
+  )
+}
+
+@Test func chromeSupportsGlobalFocusAndPositionalCommands() throws {
+  let configuration = try Configuration.decodeTOML(Data())
+
+  #expect(ApplicationTarget.chrome.bundleIdentifiers == ["com.google.Chrome"])
+  #expect(
+    ApplicationCommand.parse(
+      "focus chrome",
+      wakePhrases: configuration.wakePhrases,
+      mappings: configuration.commandMappings(for: nil)
+    ) == .focus(.chrome)
+  )
+  #expect(
+    ApplicationCommand.parse(
+      "focus 1",
+      wakePhrases: configuration.wakePhrases,
+      mappings: configuration.commandMappings(for: .chrome)
+    ) == .focusItem(1)
+  )
+}
+
+@Test func recognizesSupportedFrontmostApplicationsByBundleIdentifier() {
+  #expect(ApplicationTarget(bundleIdentifier: "com.mitchellh.ghostty") == .ghostty)
+  #expect(ApplicationTarget(bundleIdentifier: "com.openai.codex") == .chatGPT)
+  #expect(ApplicationTarget(bundleIdentifier: "com.google.Chrome") == .chrome)
+  #expect(ApplicationTarget(bundleIdentifier: "com.apple.TextEdit") == nil)
+}
+
+@Test func positionalCommandsRequireASupportedFrontmostApplication() {
+  #expect(ApplicationCommand.focusItem(1).target(frontmost: .ghostty) == .ghostty)
+  #expect(ApplicationCommand.focusItem(1).target(frontmost: .chatGPT) == .chatGPT)
+  #expect(ApplicationCommand.focusItem(1).target(frontmost: .chrome) == .chrome)
+  #expect(ApplicationCommand.focusItem(1).target(frontmost: nil) == nil)
+  #expect(ApplicationCommand.focus(.chrome).target(frontmost: nil) == .chrome)
+}
+
+@Test func parsesShortChatFocusAlias() throws {
+  let configuration = try Configuration.decodeTOML(
+    Data(
+      """
+      target = "ghostty"
+      """.utf8
+    )
+  )
+
+  #expect(
+    ApplicationCommand.parse(
+      "focus chat",
+      wakePhrases: configuration.wakePhrases,
+      mappings: configuration.commandMappings(for: .ghostty)
+    ) == .focus(.chatGPT)
+  )
+  #expect(configuration.contextualPhrases.contains("focus chat"))
 }
 
 @Test func rejectsCommandsOutsideAnApplicationHierarchy() {
@@ -69,7 +182,7 @@ import Testing
   }
 }
 
-@Test func speechContextOnlyIncludesTheActiveApplicationsCommands() throws {
+@Test func speechContextIncludesCommandsForEverySupportedFrontmostTarget() throws {
   let configuration = try Configuration.decodeTOML(
     Data(
       """
@@ -77,15 +190,19 @@ import Testing
 
       [applications.ghostty.commands]
       focus = ["terminal only"]
+      new_chat = ["terminal action"]
 
       [applications.chatgpt.commands]
       focus = ["app only"]
+      new_chat = ["app action"]
       """.utf8
     )
   )
 
   #expect(configuration.contextualPhrases.contains("app only"))
-  #expect(!configuration.contextualPhrases.contains("terminal only"))
+  #expect(configuration.contextualPhrases.contains("terminal only"))
+  #expect(configuration.contextualPhrases.contains("app action"))
+  #expect(configuration.contextualPhrases.contains("terminal action"))
 }
 
 @Test func rejectsGhosttyOnlyNavigationCommandsForChatGPT() {
@@ -124,8 +241,8 @@ import Testing
   #expect(configuration.silenceSeconds == 6.5)
   #expect(configuration.silenceThresholdDB == -38)
   #expect(configuration.maximumRecordingSeconds == 120)
-  #expect(configuration.activeCommands.newChat == ["make a chat"])
-  #expect(configuration.activeCommands.next == CommandPhrases.ghosttyDefaults.next)
+  #expect(configuration.applicationCommands[.ghostty]?.newChat == ["make a chat"])
+  #expect(configuration.applicationCommands[.ghostty]?.next == CommandPhrases.ghosttyDefaults.next)
 }
 
 @Test func rejectsPhraseCollisionAcrossActions() throws {
@@ -134,6 +251,22 @@ import Testing
     wake = ["ghostee"]
     submit = ["ghost it"]
     cancel = ["ghost it"]
+    """.utf8
+  )
+
+  #expect(throws: ConfigurationError.self) {
+    try Configuration.decodeTOML(data)
+  }
+}
+
+@Test func rejectsCollisionWithGlobalApplicationFocusPhrase() {
+  let data = Data(
+    """
+    [applications.ghostty.commands]
+    new_chat = ["focus chat"]
+
+    [applications.chatgpt.commands]
+    focus = ["focus chat"]
     """.utf8
   )
 
@@ -158,7 +291,7 @@ import Testing
     ApplicationCommand.parse(
       "Computer, make a chat",
       wakePhrases: configuration.wakePhrases,
-      commands: configuration.activeCommands
+      mappings: configuration.commandMappings(for: .ghostty)
     ) == .newChat
   )
 }

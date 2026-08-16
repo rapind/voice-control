@@ -17,7 +17,7 @@ struct CommandPhrases: Equatable {
   var focus9: [String]
 
   static let ghosttyDefaults = CommandPhrases(
-    focus: ["focus ghostty", "focus ghostee", "show ghostty", "show ghostee"],
+    focus: ["focus ghost tee"],
     newChat: ["new chat"],
     next: ["focus next"],
     previous: ["focus previous", "focus prev"],
@@ -33,7 +33,7 @@ struct CommandPhrases: Equatable {
   )
 
   static let chatGPTDefaults = CommandPhrases(
-    focus: ["focus chatgpt", "show chatgpt"],
+    focus: ["focus chat"],
     newChat: ["new chat"],
     next: [],
     previous: [],
@@ -48,12 +48,32 @@ struct CommandPhrases: Equatable {
     focus9: ["focus 9"]
   )
 
-  var mappings: [(ApplicationCommand, [String])] {
+  static let chromeDefaults = CommandPhrases(
+    focus: ["focus chrome"],
+    newChat: [],
+    next: [],
+    previous: [],
+    focus1: ["focus 1"],
+    focus2: ["focus 2"],
+    focus3: ["focus 3"],
+    focus4: ["focus 4"],
+    focus5: ["focus 5"],
+    focus6: ["focus 6"],
+    focus7: ["focus 7"],
+    focus8: ["focus 8"],
+    focus9: ["focus 9"]
+  )
+
+  var nonFocusMappings: [(ApplicationCommand, [String])] {
     [
-      (.focus, focus),
       (.newChat, newChat),
       (.nextItem, next),
       (.previousItem, previous),
+    ] + positionalMappings
+  }
+
+  var positionalMappings: [(ApplicationCommand, [String])] {
+    [
       (.focusItem(1), focus1),
       (.focusItem(2), focus2),
       (.focusItem(3), focus3),
@@ -66,13 +86,9 @@ struct CommandPhrases: Equatable {
     ]
   }
 
-  var allPhrases: [String] {
-    mappings.flatMap(\.1)
-  }
 }
 
 struct Configuration: Equatable {
-  var target: ApplicationTarget
   var wakePhrases: [String]
   var submitPhrases: [String]
   var cancelPhrases: [String]
@@ -82,7 +98,6 @@ struct Configuration: Equatable {
   var applicationCommands: [ApplicationTarget: CommandPhrases]
 
   static let defaults = Configuration(
-    target: .ghostty,
     wakePhrases: ["ghostee", "ghostty", "ghostie", "ghosty", "ghost tea"],
     submitPhrases: ["ghost it"],
     cancelPhrases: ["ghost cancel"],
@@ -92,12 +107,12 @@ struct Configuration: Equatable {
     applicationCommands: [
       .ghostty: .ghosttyDefaults,
       .chatGPT: .chatGPTDefaults,
+      .chrome: .chromeDefaults,
     ]
   )
 
   static let defaultTOML = """
     # Voice Control reloads this file automatically after you save it.
-    target = "ghostty"
     wake = ["ghostee", "ghostty", "ghostie", "ghosty", "ghost tea"]
     submit = ["ghost it"]
     cancel = ["ghost cancel"]
@@ -107,7 +122,7 @@ struct Configuration: Equatable {
     maximum_recording_seconds = 90
 
     [applications.ghostty.commands]
-    focus = ["focus ghostty", "focus ghostee", "show ghostty", "show ghostee"]
+    focus = ["focus ghost tee"]
     new_chat = ["new chat"]
     next = ["focus next"]
     previous = ["focus previous", "focus prev"]
@@ -122,8 +137,20 @@ struct Configuration: Equatable {
     focus_9 = ["focus 9"]
 
     [applications.chatgpt.commands]
-    focus = ["focus chatgpt", "show chatgpt"]
+    focus = ["focus chat"]
     new_chat = ["new chat"]
+    focus_1 = ["focus 1"]
+    focus_2 = ["focus 2"]
+    focus_3 = ["focus 3"]
+    focus_4 = ["focus 4"]
+    focus_5 = ["focus 5"]
+    focus_6 = ["focus 6"]
+    focus_7 = ["focus 7"]
+    focus_8 = ["focus 8"]
+    focus_9 = ["focus 9"]
+
+    [applications.chrome.commands]
+    focus = ["focus chrome"]
     focus_1 = ["focus 1"]
     focus_2 = ["focus 2"]
     focus_3 = ["focus 3"]
@@ -140,12 +167,12 @@ struct Configuration: Equatable {
       .appendingPathComponent(".config/voice-control/config.toml")
   }
 
-  var activeCommands: CommandPhrases {
-    applicationCommands[target]!
-  }
-
   var contextualPhrases: [String] {
-    wakePhrases + submitPhrases + cancelPhrases + activeCommands.allPhrases
+    var seen: Set<String> = []
+    let phrases =
+      wakePhrases + submitPhrases + cancelPhrases
+      + ApplicationTarget.allCases.flatMap { commandMappings(for: $0).flatMap(\.1) }
+    return phrases.filter { seen.insert(PhraseMatcher.normalize($0)).inserted }
   }
 
   static func decodeTOML(_ data: Data) throws -> Configuration {
@@ -157,13 +184,12 @@ struct Configuration: Equatable {
     }
     guard raw.commands == nil else {
       throw ConfigurationError(
-        "[commands] is invalid; put commands under [applications.ghostty.commands] or [applications.chatgpt.commands]"
+        "[commands] is invalid; put commands under an [applications.<name>.commands] table"
       )
     }
 
     let defaults = Configuration.defaults
     var configuration = Configuration(
-      target: raw.target ?? defaults.target,
       wakePhrases: raw.wake ?? defaults.wakePhrases,
       submitPhrases: raw.submit ?? defaults.submitPhrases,
       cancelPhrases: raw.cancel ?? defaults.cancelPhrases,
@@ -179,6 +205,10 @@ struct Configuration: Equatable {
         .chatGPT: commandPhrases(
           raw.applications?.chatGPT?.commands,
           defaults: defaults.applicationCommands[.chatGPT]!
+        ),
+        .chrome: commandPhrases(
+          raw.applications?.chrome?.commands,
+          defaults: defaults.applicationCommands[.chrome]!
         ),
       ]
     )
@@ -248,7 +278,7 @@ struct Configuration: Equatable {
     submitPhrases = try Self.controlPhrases(submitPhrases, name: "submit")
     cancelPhrases = try Self.controlPhrases(cancelPhrases, name: "cancel")
 
-    for target in [ApplicationTarget.ghostty, .chatGPT] {
+    for target in ApplicationTarget.allCases {
       var commands = applicationCommands[target]!
       commands.focus = Self.normalizedPhrases(commands.focus)
       commands.newChat = Self.normalizedPhrases(commands.newChat)
@@ -265,11 +295,13 @@ struct Configuration: Equatable {
       commands.focus9 = Self.normalizedPhrases(commands.focus9)
       applicationCommands[target] = commands
     }
-    let chatGPTCommands = applicationCommands[.chatGPT]!
-    guard chatGPTCommands.next.isEmpty, chatGPTCommands.previous.isEmpty else {
-      throw ConfigurationError(
-        "ChatGPT does not support next or previous commands; use focus_1 through focus_9"
-      )
+    for target in [ApplicationTarget.chatGPT, .chrome] {
+      let commands = applicationCommands[target]!
+      guard commands.next.isEmpty, commands.previous.isEmpty else {
+        throw ConfigurationError(
+          "\(target.displayName) does not support next or previous commands; use focus_1 through focus_9"
+        )
+      }
     }
 
     guard silenceSeconds >= 1 else {
@@ -282,14 +314,14 @@ struct Configuration: Equatable {
       throw ConfigurationError("maximum_recording_seconds must be at least 5")
     }
 
-    for target in [ApplicationTarget.ghostty, .chatGPT] {
+    for target in ApplicationTarget.allCases {
       var owners: [String: String] = [:]
       let groups: [(String, [String])] =
         [
           ("wake", wakePhrases),
           ("submit", submitPhrases),
           ("cancel", cancelPhrases),
-        ] + applicationCommands[target]!.mappings.map { ("command \($0.0)", $0.1) }
+        ] + commandMappings(for: target).map { ("command \($0.0)", $0.1) }
       for (owner, phrases) in groups {
         for phrase in phrases {
           let normalized = PhraseMatcher.normalize(phrase)
@@ -302,6 +334,20 @@ struct Configuration: Equatable {
         }
       }
     }
+  }
+
+  func commandMappings(for sessionTarget: ApplicationTarget?) -> [(
+    ApplicationCommand, [String]
+  )] {
+    let globalFocusMappings: [(ApplicationCommand, [String])] = ApplicationTarget.allCases.map {
+      target in
+      (.focus(target), applicationCommands[target]!.focus)
+    }
+    guard let sessionTarget else {
+      return globalFocusMappings
+        + ApplicationTarget.allCases.flatMap { applicationCommands[$0]!.positionalMappings }
+    }
+    return globalFocusMappings + applicationCommands[sessionTarget]!.nonFocusMappings
   }
 
   private static func controlPhrases(_ phrases: [String], name: String) throws -> [String] {
@@ -345,10 +391,12 @@ private struct RawConfiguration: Decodable {
 private struct RawApplications: Decodable {
   var ghostty: RawApplication?
   var chatGPT: RawApplication?
+  var chrome: RawApplication?
 
   enum CodingKeys: String, CodingKey {
     case ghostty
     case chatGPT = "chatgpt"
+    case chrome
   }
 }
 

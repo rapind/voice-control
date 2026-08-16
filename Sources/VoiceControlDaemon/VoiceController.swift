@@ -16,6 +16,7 @@ final class VoiceController {
   private var modelReady = false
   private var voiceReady = false
   private var targetPID: pid_t?
+  private var sessionTarget: ApplicationTarget?
   private var lastSpeechAt = Date()
   private var recordingStartedAt = Date()
   private var submitTailDuration: TimeInterval?
@@ -152,7 +153,9 @@ final class VoiceController {
       }
 
     case .beginPromptRecording:
-      targetPID = applicationController.captureTargetPID(for: configuration.target)
+      let capturedApplication = applicationController.captureFrontmostApplication()
+      targetPID = capturedApplication?.processIdentifier
+      sessionTarget = capturedApplication?.target
       heardPromptSpeech = false
       recordingStartedAt = Date()
       ignoreSilenceUntil = Date().addingTimeInterval(0.6)
@@ -160,7 +163,7 @@ final class VoiceController {
       submitTailDuration = nil
       preview = TranscriptPreview()
       pendingPreviewText = ""
-      previewReady = false
+      previewReady = targetPID != nil
       let liveInput = LiveAudioBufferSink()
       liveAudioRouter.route(to: liveInput)
       startLiveTranscription(input: liveInput)
@@ -168,19 +171,7 @@ final class VoiceController {
         try audio.beginRecording()
         NSSound(named: "Tink")?.play()
         startSilenceTimer()
-        applicationController.focus(configuration.target, targetPID: targetPID) {
-          [weak self] result in
-          DispatchQueue.main.async {
-            guard let self, self.machine.phase == .recording else { return }
-            switch result {
-            case .success:
-              self.previewReady = true
-              self.applyPendingPreview()
-            case .failure(let error):
-              self.fail(error.localizedDescription)
-            }
-          }
-        }
+        applyPendingPreview()
       } catch {
         fail("Could not begin recording: \(error.localizedDescription)")
       }
@@ -224,7 +215,7 @@ final class VoiceController {
       if let command = ApplicationCommand.parse(
         text,
         wakePhrases: configuration.wakePhrases,
-        commands: configuration.activeCommands
+        mappings: configuration.commandMappings(for: sessionTarget)
       ) {
         if case .failure(let error) = clearLivePreview() {
           fail(error.localizedDescription)
@@ -236,7 +227,6 @@ final class VoiceController {
         applicationController.submitPreview(
           edit,
           finalText: text,
-          to: configuration.target,
           targetPID: targetPID
         ) { [weak self] result in
           self?.completeApplicationOperation(result)
@@ -292,9 +282,11 @@ final class VoiceController {
       } else if let command = ApplicationCommand.parse(
         transcript.text,
         wakePhrases: configuration.wakePhrases,
-        commands: configuration.activeCommands
+        mappings: configuration.commandMappings(for: sessionTarget)
       ) {
-        print("\(configuration.target.displayName) command detected: \(command)")
+        if let commandTarget = command.target(frontmost: sessionTarget) {
+          print("\(commandTarget.displayName) command detected: \(command)")
+        }
         dispatch(.commandDetected(command))
       }
     default:
@@ -343,7 +335,6 @@ final class VoiceController {
     guard edit.deleteCount > 0 || !edit.insertion.isEmpty else { return }
     switch applicationController.applyPreviewEdit(
       edit,
-      to: configuration.target,
       targetPID: targetPID
     ) {
     case .success:
@@ -364,7 +355,6 @@ final class VoiceController {
     guard edit.deleteCount > 0 || !edit.insertion.isEmpty else { return .success(()) }
     let result = applicationController.applyPreviewEdit(
       edit,
-      to: configuration.target,
       targetPID: targetPID
     )
     if case .success = result {
@@ -424,8 +414,16 @@ final class VoiceController {
   }
 
   private func execute(_ command: ApplicationCommand) {
+    guard let commandTarget = command.target(frontmost: sessionTarget) else {
+      print("Command ignored because the captured application is unsupported: \(command)")
+      completeApplicationOperation(.success(()))
+      return
+    }
+    let commandTargetPID =
+      command.focusTarget == nil
+      ? targetPID : applicationController.captureTargetPID(for: commandTarget)
     applicationController.execute(
-      command, for: configuration.target, targetPID: targetPID
+      command, for: commandTarget, targetPID: commandTargetPID
     ) { [weak self] result in
       self?.completeApplicationOperation(result)
     }
@@ -484,7 +482,7 @@ final class VoiceController {
 
   private func printConfiguration() {
     print("Voice Control Prototype")
-    print("  target: \(configuration.target.displayName)")
+    print("  routing: frontmost application")
     print("  wake phrases: \(configuration.wakePhrases.joined(separator: ", "))")
     print("  submit phrases: \(configuration.submitPhrases.joined(separator: ", "))")
     print("  cancel phrases: \(configuration.cancelPhrases.joined(separator: ", "))")

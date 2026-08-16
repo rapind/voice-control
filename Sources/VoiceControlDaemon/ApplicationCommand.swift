@@ -1,16 +1,25 @@
 import Foundation
 
 enum ApplicationCommand: Equatable, Hashable {
-  case focus
+  case focus(ApplicationTarget)
   case newChat
   case focusItem(Int)
   case nextItem
   case previousItem
 
+  var focusTarget: ApplicationTarget? {
+    if case .focus(let target) = self { return target }
+    return nil
+  }
+
+  func target(frontmost: ApplicationTarget?) -> ApplicationTarget? {
+    focusTarget ?? frontmost
+  }
+
   static func parse(
     _ transcript: String,
     wakePhrases: [String],
-    commands: CommandPhrases
+    mappings: [(ApplicationCommand, [String])]
   ) -> ApplicationCommand? {
     var normalized = PhraseMatcher.normalize(transcript)
     for phrase in wakePhrases.sorted(by: {
@@ -26,7 +35,7 @@ enum ApplicationCommand: Equatable, Hashable {
       }
     }
 
-    for (command, phrases) in commands.mappings {
+    for (command, phrases) in mappings {
       if phrases.contains(where: { PhraseMatcher.normalize($0) == normalized }) {
         return command
       }

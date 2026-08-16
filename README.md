@@ -2,12 +2,12 @@
 
 This is throwaway code answering one question: can one small macOS process reliably own the complete voice transaction without wrapping Codex or interfering with the target application's rendering?
 
-The daemon listens for a wake phrase, focuses the configured application, shows a live transcription while recording, finalizes that transcript, and presses Return. It uses Apple Speech progressive transcription on macOS 26 and FluidAudio Parakeet on macOS 14 and 15.
+The daemon listens for a wake phrase, captures the frontmost window without changing focus, shows a live transcription while recording, finalizes that transcript, and presses Return. It uses Apple Speech progressive transcription on macOS 26 and FluidAudio Parakeet on macOS 14 and 15.
 
 ## Before running
 
 1. On macOS 14 or 15, load Parakeet once in TypeWhisper. The prototype reuses the model files already stored in FluidAudio's shared cache. TypeWhisper does not need to remain open. On macOS 26, the app installs and uses Apple's on-device `en-US` speech asset.
-2. Run Ghostty or ChatGPT, whichever is selected by `target` in the configuration.
+2. Run Ghostty, ChatGPT, or Google Chrome when you want to use their application shortcuts.
 
 ## Run the installed app
 
@@ -37,11 +37,10 @@ The editable configuration lives at:
 ~/.config/voice-control/config.toml
 ```
 
-The current Ghostty setup is:
+The current setup is:
 
 ```toml
 # Voice Control reloads this file automatically after you save it.
-target = "ghostty"
 wake = ["pewter", "pooter", "pyewter", "computer"]
 submit = ["send it", "sent it"]
 cancel = ["cancel it"]
@@ -51,7 +50,7 @@ silence_threshold_db = -45
 maximum_recording_seconds = 90
 
 [applications.ghostty.commands]
-focus = ["focus term"]
+focus = ["focus ghost tee"]
 new_chat = ["new chat"]
 next = ["focus next"]
 previous = ["focus previous", "focus prev"]
@@ -66,8 +65,20 @@ focus_8 = ["focus 8"]
 focus_9 = ["focus 9"]
 
 [applications.chatgpt.commands]
-focus = ["focus chatgpt"]
+focus = ["focus chat"]
 new_chat = ["new chat"]
+focus_1 = ["focus 1"]
+focus_2 = ["focus 2"]
+focus_3 = ["focus 3"]
+focus_4 = ["focus 4"]
+focus_5 = ["focus 5"]
+focus_6 = ["focus 6"]
+focus_7 = ["focus 7"]
+focus_8 = ["focus 8"]
+focus_9 = ["focus 9"]
+
+[applications.chrome.commands]
+focus = ["focus chrome"]
 focus_1 = ["focus 1"]
 focus_2 = ["focus 2"]
 focus_3 = ["focus 3"]
@@ -79,9 +90,11 @@ focus_8 = ["focus 8"]
 focus_9 = ["focus 9"]
 ```
 
-Set `target` to either `ghostty` or `chatgpt`. Save the file and the app applies valid changes within about one second. You do not need to rebuild or restart it. Invalid TOML leaves the last working configuration active and shows a config error in the menu.
+Save the file and the app applies valid changes within about one second. You do not need to rebuild or restart it. Invalid TOML leaves the last working configuration active and shows a config error in the menu. Older `target` settings are accepted but no longer control routing.
 
-Command phrases are scoped to their application. Only the active target's command table is sent to speech recognition or evaluated at runtime. The same phrase, such as `focus 1`, can safely mean tab 1 in Ghostty and chat 1 in ChatGPT.
+The wake phrase starts recording without changing focus. Dictation is bound to whichever window was frontmost when recording started. Direct focus phrases are global: `focus ghost tee`, `focus chat`, and `focus chrome`.
+
+Other commands use the supported application that was frontmost at wake time. `focus 1` sends Command+1 only when Ghostty, ChatGPT, or Chrome was frontmost. If another application was frontmost, the phrase is consumed without sending a keyboard shortcut.
 
 Use another configuration file when launching if needed:
 
@@ -89,21 +102,20 @@ Use another configuration file when launching if needed:
 ./run-prototype.sh --config "$HOME/path/to/config.toml"
 ```
 
-On first launch, macOS asks for Microphone, Speech Recognition, and Accessibility permission. Accessibility is required for focusing the target application and sending keyboard input.
+On first launch, macOS asks for Microphone, Speech Recognition, and Accessibility permission. Accessibility is required for typing dictation, focusing applications, and sending keyboard shortcuts.
 
 The menu-bar item shows the current state and active control phrases. Use **Open Configuration** there to edit the TOML file. Quit it from that menu or press Control-C in the launching terminal.
 
 ## Application commands
 
-The configured target is focused as soon as any wake phrase is recognized. Its command aliases execute immediately from Apple Speech partials and do not require a submit phrase.
+The wake phrase only starts recording. It does not focus an application. Command aliases execute immediately from Apple Speech partials and do not require a submit phrase.
 
-Both targets support:
+Ghostty, ChatGPT, and Chrome support:
 
-- `new chat`
 - `focus 1` through `focus 9`
-- An application-specific focus phrase
+- Their global application focus phrase
 
-For Ghostty, `new chat` opens a new tab, types `codex`, and presses Return. Ghostty also supports `focus next` and `focus previous`. For ChatGPT, `new chat` sends Command-N. Numbered focus commands send Command-1 through Command-9 to the selected application.
+For Ghostty, `new chat` opens a new tab, types `codex`, and presses Return. Ghostty also supports `focus next` and `focus previous`. For ChatGPT, `new chat` sends Command-N. Chrome does not define a `new chat` command. Numbered focus commands send Command-1 through Command-9 to the captured supported application.
 
 All other speech remains a normal prompt. On macOS 26, Apple progressive results revise the visible text while recording and finalize through the end of the same audio stream. On macOS 14 and 15, rolling full-context Parakeet passes provide the preview and a final file pass remains authoritative.
 
@@ -111,7 +123,7 @@ The configured submit phrase creates an audio cutoff. The phrase itself and anyt
 
 ## Prototype limits
 
-- It targets the selected application's frontmost process when the wake phrase is detected. If another app is frontmost, it falls back to the selected running application.
+- Dictation stays bound to the window captured at wake time. Changing windows during recording stops live typing rather than redirecting text.
 - Apple Speech preview results may revise earlier words until stream finalization. The Parakeet fallback updates about every 1.5 seconds and replaces its preview with the final full-context pass.
 - Live preview typing stops rather than sending text to an application that is no longer frontmost.
 - Model downloading and Hugging Face authentication are deliberately out of scope for the Parakeet fallback. It fails clearly when the shared cached model is missing. Apple Speech assets are installed through `AssetInventory`.

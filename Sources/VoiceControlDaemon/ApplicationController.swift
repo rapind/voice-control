@@ -3,6 +3,11 @@ import ApplicationServices
 import Foundation
 import OSLog
 
+struct CapturedApplication {
+  let processIdentifier: pid_t
+  let target: ApplicationTarget?
+}
+
 final class ApplicationController {
   private let logger = Logger(
     subsystem: "com.daverapin.voice-control-prototype",
@@ -23,6 +28,14 @@ final class ApplicationController {
     return NSWorkspace.shared.runningApplications
       .first(where: { isTarget($0, target: target) })?
       .processIdentifier
+  }
+
+  func captureFrontmostApplication() -> CapturedApplication? {
+    guard let app = NSWorkspace.shared.frontmostApplication else { return nil }
+    return CapturedApplication(
+      processIdentifier: app.processIdentifier,
+      target: target(for: app)
+    )
   }
 
   func focus(
@@ -61,7 +74,6 @@ final class ApplicationController {
 
   func applyPreviewEdit(
     _ edit: PreviewEdit,
-    to target: ApplicationTarget,
     targetPID: pid_t?
   ) -> Result<Void, Error> {
     guard AXIsProcessTrusted() else {
@@ -69,16 +81,13 @@ final class ApplicationController {
     }
     guard let targetPID,
       let app = NSRunningApplication(processIdentifier: targetPID),
-      !app.isTerminated,
-      isTarget(app, target: target)
+      !app.isTerminated
     else {
-      return .failure(InjectionError("The captured \(target.displayName) target is unavailable"))
+      return .failure(InjectionError("The captured application is unavailable"))
     }
     guard NSWorkspace.shared.frontmostApplication?.processIdentifier == targetPID else {
       return .failure(
-        InjectionError(
-          "\(target.displayName) is no longer frontmost; live transcription was not typed"
-        ))
+        InjectionError("The captured application is no longer frontmost; transcription stopped"))
     }
 
     for _ in 0..<edit.deleteCount {
@@ -95,33 +104,26 @@ final class ApplicationController {
   func submitPreview(
     _ edit: PreviewEdit,
     finalText: String,
-    to target: ApplicationTarget,
     targetPID: pid_t?,
     completion: @escaping (Result<Void, Error>) -> Void
   ) {
-    focus(target, targetPID: targetPID) { [weak self] focusResult in
-      guard let self else { return }
-      if case .failure(let error) = focusResult {
-        completion(.failure(error))
+    if case .failure(let error) = applyPreviewEdit(edit, targetPID: targetPID) {
+      completion(.failure(error))
+      return
+    }
+    DispatchQueue.main.asyncAfter(
+      deadline: .now() + SubmissionTiming.returnDelay(for: finalText)
+    ) {
+      guard NSWorkspace.shared.frontmostApplication?.processIdentifier == targetPID else {
+        completion(
+          .failure(InjectionError("The captured application is no longer frontmost")))
         return
       }
-      if case .failure(let error) = self.applyPreviewEdit(
-        edit,
-        to: target,
-        targetPID: targetPID
-      ) {
+      do {
+        try self.pressReturnUsingSystemEvents()
+        completion(.success(()))
+      } catch {
         completion(.failure(error))
-        return
-      }
-      DispatchQueue.main.asyncAfter(
-        deadline: .now() + SubmissionTiming.returnDelay(for: finalText)
-      ) {
-        do {
-          try self.pressReturnUsingSystemEvents()
-          completion(.success(()))
-        } catch {
-          completion(.failure(error))
-        }
       }
     }
   }
@@ -132,44 +134,38 @@ final class ApplicationController {
     targetPID: pid_t?,
     completion: @escaping (Result<Void, Error>) -> Void
   ) {
-    focus(target, targetPID: targetPID) { [weak self] focusResult in
-      guard let self else { return }
-      if case .failure(let error) = focusResult {
-        completion(.failure(error))
-        return
-      }
-      guard command != .focus else {
-        completion(.success(()))
-        return
-      }
-      if command == .newChat, target == .ghostty {
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-          guard self.postKey(keyCode: 17, flags: .maskCommand) else {
-            completion(.failure(InjectionError("Could not create a new Ghostty tab")))
-            return
-          }
-          self.pasteAndSubmit(
-            "codex",
-            to: target,
-            delay: 0.6,
-            completion: completion
-          )
-        }
-        return
-      }
-      guard let keyStroke = self.keyStroke(for: command, target: target) else {
-        completion(.failure(InjectionError("Unsupported \(target.displayName) command")))
-        return
-      }
-      DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-        guard self.postKey(keyCode: keyStroke.keyCode, flags: keyStroke.flags) else {
-          completion(
-            .failure(InjectionError("Could not send the \(target.displayName) keyboard command")))
-          return
-        }
-        completion(.success(()))
-      }
+    if case .focus = command {
+      focus(target, targetPID: targetPID, completion: completion)
+      return
     }
+    guard isFrontmostTarget(target, pid: targetPID) else {
+      completion(
+        .failure(InjectionError("\(target.displayName) is no longer the frontmost application")))
+      return
+    }
+    if command == .newChat, target == .ghostty {
+      guard postKey(keyCode: 17, flags: .maskCommand) else {
+        completion(.failure(InjectionError("Could not create a new Ghostty tab")))
+        return
+      }
+      pasteAndSubmit(
+        "codex",
+        to: target,
+        delay: 0.6,
+        completion: completion
+      )
+      return
+    }
+    guard let keyStroke = keyStroke(for: command, target: target) else {
+      completion(.failure(InjectionError("Unsupported \(target.displayName) command")))
+      return
+    }
+    guard postKey(keyCode: keyStroke.keyCode, flags: keyStroke.flags) else {
+      completion(
+        .failure(InjectionError("Could not send the \(target.displayName) keyboard command")))
+      return
+    }
+    completion(.success(()))
   }
 
   private func requestFocus(_ app: NSRunningApplication, target: ApplicationTarget) throws {
@@ -237,6 +233,28 @@ final class ApplicationController {
     return app.localizedName?.lowercased() == target.displayName.lowercased()
   }
 
+  private func target(for app: NSRunningApplication) -> ApplicationTarget? {
+    if let identifier = app.bundleIdentifier,
+      let target = ApplicationTarget(bundleIdentifier: identifier)
+    {
+      return target
+    }
+    return ApplicationTarget.allCases.first(where: {
+      app.localizedName?.lowercased() == $0.displayName.lowercased()
+    })
+  }
+
+  private func isFrontmostTarget(_ target: ApplicationTarget, pid: pid_t?) -> Bool {
+    guard let pid,
+      let app = NSRunningApplication(processIdentifier: pid),
+      !app.isTerminated,
+      isTarget(app, target: target)
+    else {
+      return false
+    }
+    return NSWorkspace.shared.frontmostApplication?.processIdentifier == pid
+  }
+
   private func keyStroke(for command: ApplicationCommand, target: ApplicationTarget) -> (
     keyCode: CGKeyCode, flags: CGEventFlags
   )? {
@@ -247,6 +265,7 @@ final class ApplicationController {
       switch target {
       case .ghostty: return nil
       case .chatGPT: return (45, .maskCommand)
+      case .chrome: return nil
       }
     case .focusItem(let number):
       let keyCodes: [Int: CGKeyCode] = [

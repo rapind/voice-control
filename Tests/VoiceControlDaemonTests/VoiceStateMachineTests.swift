@@ -23,8 +23,9 @@ import Testing
   #expect(!ApplicationCommand.newChat.isDirectFocusCommand)
 }
 
-@Test func wakeListenerRecoversOnlyWhenIdleAudioStops() {
-  #expect(WakeListenerHealth.shouldRecover(phase: .waitingForWake, audioIsRunning: false))
-  #expect(!WakeListenerHealth.shouldRecover(phase: .waitingForWake, audioIsRunning: true))
-  #expect(!WakeListenerHealth.shouldRecover(phase: .recording, audioIsRunning: false))
+@Test func wakeListenerRecoversOnlyWhenIdleAudioStalls() {
+  #expect(WakeListenerHealth.shouldRecover(phase: .waitingForWake, audioIsRunning: false, isReceivingAudio: true))
+  #expect(WakeListenerHealth.shouldRecover(phase: .waitingForWake, audioIsRunning: true, isReceivingAudio: false))
+  #expect(!WakeListenerHealth.shouldRecover(phase: .waitingForWake, audioIsRunning: true, isReceivingAudio: true))
+  #expect(!WakeListenerHealth.shouldRecover(phase: .recording, audioIsRunning: false, isReceivingAudio: true))
 }

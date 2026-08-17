@@ -14,6 +14,7 @@ final class AudioCapture {
   private var totalCapturedTime: TimeInterval = 0
   private var tapInstalled = false
   private var tapFormat: AVAudioFormat?
+  private var lastBufferReceivedAt: Date?
   private var configurationChangeObserver: NSObjectProtocol?
 
   init() {
@@ -33,6 +34,16 @@ final class AudioCapture {
   }
 
   var isRunning: Bool { engine.isRunning }
+
+  /// True when audio buffers have arrived recently. A running engine that is
+  /// not delivering buffers means the tap failed to install, for example when
+  /// the input device changed while the engine was reconfiguring.
+  var isReceivingAudio: Bool {
+    lock.lock()
+    defer { lock.unlock() }
+    guard let lastBufferReceivedAt else { return false }
+    return Date().timeIntervalSince(lastBufferReceivedAt) < 3
+  }
 
   static func requestPermission(_ completion: @escaping (Bool) -> Void) {
     switch AVCaptureDevice.authorizationStatus(for: .audio) {
@@ -74,6 +85,7 @@ final class AudioCapture {
         self.lock.lock()
         let bufferStartTime = self.totalCapturedTime
         self.totalCapturedTime += duration
+        self.lastBufferReceivedAt = Date()
         let file = self.recordingFile
         if let file {
           do {

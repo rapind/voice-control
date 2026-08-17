@@ -474,12 +474,13 @@ final class VoiceController {
         let self,
         WakeListenerHealth.shouldRecover(
           phase: self.machine.phase,
-          audioIsRunning: self.audio.isRunning
+          audioIsRunning: self.audio.isRunning,
+          isReceivingAudio: self.audio.isReceivingAudio
         )
       else {
         return
       }
-      self.logger.notice("Audio capture stopped; restarting wake listener")
+      self.logger.notice("Audio capture stalled; restarting wake listener")
       self.restartWakeListener()
     }
     RunLoop.main.add(timer, forMode: .common)
@@ -488,13 +489,22 @@ final class VoiceController {
 
   private func handleAudioConfigurationChange() {
     guard machine.phase == .waitingForWake else { return }
+    // The engine reconfigures asynchronously when the input device changes.
+    // Restarting immediately races that reconfiguration: the tap can be
+    // installed with a stale format, which leaves the engine running without
+    // delivering audio. Stop now and restart once the new device's format has
+    // settled.
     audio.stop()
-    restartWakeListener()
+    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+      guard let self, self.machine.phase == .waitingForWake else { return }
+      self.restartWakeListener()
+    }
   }
 
   private func restartWakeListener() {
     keywords.stop()
     lastKeywordTranscript = ""
+    audio.stop()
     do {
       try audio.start()
       try keywords.start()
@@ -573,7 +583,11 @@ final class VoiceController {
 }
 
 enum WakeListenerHealth {
-  static func shouldRecover(phase: VoicePhase, audioIsRunning: Bool) -> Bool {
-    phase == .waitingForWake && !audioIsRunning
+  static func shouldRecover(
+    phase: VoicePhase,
+    audioIsRunning: Bool,
+    isReceivingAudio: Bool
+  ) -> Bool {
+    phase == .waitingForWake && (!audioIsRunning || !isReceivingAudio)
   }
 }

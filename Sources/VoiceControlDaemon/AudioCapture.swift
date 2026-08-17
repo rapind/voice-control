@@ -5,6 +5,7 @@ final class AudioCapture {
   var onBuffer: ((AVAudioPCMBuffer, TimeInterval) -> Void)?
   var onRecordingBuffer: ((AVAudioPCMBuffer) -> Void)?
   var onLevel: ((Float) -> Void)?
+  var onConfigurationChange: (() -> Void)?
 
   private let engine = AVAudioEngine()
   private let lock = NSLock()
@@ -12,6 +13,24 @@ final class AudioCapture {
   private var recordingURL: URL?
   private var totalCapturedTime: TimeInterval = 0
   private var tapInstalled = false
+  private var tapFormat: AVAudioFormat?
+  private var configurationChangeObserver: NSObjectProtocol?
+
+  init() {
+    configurationChangeObserver = NotificationCenter.default.addObserver(
+      forName: .AVAudioEngineConfigurationChange,
+      object: engine,
+      queue: .main
+    ) { [weak self] _ in
+      self?.onConfigurationChange?()
+    }
+  }
+
+  deinit {
+    if let configurationChangeObserver {
+      NotificationCenter.default.removeObserver(configurationChangeObserver)
+    }
+  }
 
   var isRunning: Bool { engine.isRunning }
 
@@ -34,6 +53,16 @@ final class AudioCapture {
     let format = input.outputFormat(forBus: 0)
     guard format.sampleRate > 0, format.channelCount > 0 else {
       throw AudioCaptureError("The selected microphone has no usable input format")
+    }
+
+    // When the default input device changes (for example AirPods disconnect),
+    // the hardware format changes with it. A tap installed for the old format
+    // would stop the engine from starting, so reinstall it against the current
+    // format whenever the two no longer match.
+    if tapInstalled, !matchesTapFormat(format) {
+      input.removeTap(onBus: 0)
+      tapInstalled = false
+      tapFormat = nil
     }
 
     if !tapInstalled {
@@ -61,6 +90,7 @@ final class AudioCapture {
         }
         self.onLevel?(level)
       }
+      tapFormat = format
       tapInstalled = true
     }
 
@@ -107,6 +137,7 @@ final class AudioCapture {
     if tapInstalled {
       engine.inputNode.removeTap(onBus: 0)
       tapInstalled = false
+      tapFormat = nil
     }
     engine.stop()
   }
@@ -118,6 +149,12 @@ final class AudioCapture {
     recordingURL = nil
     lock.unlock()
     return url
+  }
+
+  private func matchesTapFormat(_ format: AVAudioFormat) -> Bool {
+    guard let tapFormat else { return false }
+    return tapFormat.sampleRate == format.sampleRate
+      && tapFormat.channelCount == format.channelCount
   }
 
   private static func rmsDB(_ buffer: AVAudioPCMBuffer) -> Float {

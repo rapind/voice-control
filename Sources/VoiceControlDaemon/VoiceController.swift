@@ -56,6 +56,9 @@ final class VoiceController {
         self.lastSpeechAt = Date()
       }
     }
+    audio.onConfigurationChange = { [weak self] in
+      self?.handleAudioConfigurationChange()
+    }
     keywords.onTranscript = { [weak self] transcript in
       self?.handleKeywordTranscript(transcript)
     }
@@ -477,17 +480,27 @@ final class VoiceController {
         return
       }
       self.logger.notice("Audio capture stopped; restarting wake listener")
-      self.keywords.stop()
-      self.lastKeywordTranscript = ""
-      do {
-        try self.audio.start()
-        try self.keywords.start()
-      } catch {
-        self.fail("Could not restore microphone listening: \(error.localizedDescription)")
-      }
+      self.restartWakeListener()
     }
     RunLoop.main.add(timer, forMode: .common)
     audioHealthTimer = timer
+  }
+
+  private func handleAudioConfigurationChange() {
+    guard machine.phase == .waitingForWake else { return }
+    audio.stop()
+    restartWakeListener()
+  }
+
+  private func restartWakeListener() {
+    keywords.stop()
+    lastKeywordTranscript = ""
+    do {
+      try audio.start()
+      try keywords.start()
+    } catch {
+      fail("Could not restore microphone listening: \(error.localizedDescription)")
+    }
   }
 
   private func applyPendingConfiguration() -> Bool {

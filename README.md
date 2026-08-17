@@ -105,7 +105,7 @@ Save the file and the app applies valid changes within about one second. You do 
 
 The wake phrase starts recording without changing focus. Dictation is bound to whichever window was frontmost when recording started. Application-focus phrases, `focus ghost tee`, `focus chat`, and `focus chrome`, execute after a wake phrase.
 
-Focus one through eight execute directly from idle: in Ghostty they send Control+Option+1 through Control+Option+8, and in ChatGPT or Chrome they send Command+1 through Command+8. If another application was frontmost, the phrase is consumed without sending a keyboard shortcut.
+Focus one through eight and the scroll commands execute directly from idle. In Ghostty, focus commands send Control+Option+1 through Control+Option+8, and in ChatGPT or Chrome they send Command+1 through Command+8. `scroll up` and `scroll down` send mouse wheel events to the frontmost window. If another application was frontmost, the phrase is consumed without sending a keyboard shortcut.
 
 Use another configuration file when launching if needed:
 
@@ -119,14 +119,17 @@ The menu-bar item shows the current state and active control phrases. Use **Open
 
 ## Application commands
 
-The wake phrase starts recording. Once recording, command aliases execute immediately from Apple Speech partials and do not require a submit phrase. `focus one` through `focus eight` are the exception: they execute directly from idle without the wake phrase.
+The wake phrase starts recording. Once recording, command aliases execute immediately from Apple Speech partials and do not require a submit phrase. `focus one` through `focus eight`, `scroll up`, and `scroll down` are the exception: they execute directly from idle without the wake phrase.
 
 Ghostty, ChatGPT, and Chrome support:
 
 - `focus one` through `focus nine` after a wake phrase
+- `scroll up` and `scroll down` after a wake phrase
 - Their global application focus phrase
 
 For Ghostty, `new chat` opens a new tab, types `codex`, and presses Return. `clear context` sends `/clear`, and `compact context` sends `/compact`; both press Return. `quit session` sends Control-D to the foreground terminal process. `start session` types `omp` and presses Return. `share session` sends `/collab` and `stop sharing` sends `/collab stop`, each followed by Return. Numbered focus commands send Control+Option+1 through Control+Option+9, matching the recommended Herdr workspace bindings. For ChatGPT, `new chat` sends Command-N. Chrome does not define a `new chat` command. Numbered focus commands in ChatGPT and Chrome send Command-1 through Command-9.
+
+`scroll up` and `scroll down` send mouse scroll wheel events to the center of the frontmost window, so they scroll whatever is on screen without moving the cursor or changing focus.
 
 All other speech remains a normal prompt. On macOS 26, Apple progressive results revise the visible text while recording and finalize through the end of the same audio stream. On macOS 14 and 15, rolling full-context Parakeet passes provide the preview and a final file pass remains authoritative.
 

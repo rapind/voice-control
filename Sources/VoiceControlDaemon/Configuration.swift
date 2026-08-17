@@ -10,6 +10,8 @@ struct CommandPhrases: Equatable {
   var startSession: [String]
   var shareSession: [String]
   var stopSharing: [String]
+  var scrollUp: [String]
+  var scrollDown: [String]
   var focus1: [String]
   var focus2: [String]
   var focus3: [String]
@@ -29,6 +31,8 @@ struct CommandPhrases: Equatable {
     startSession: ["start session"],
     shareSession: ["share session"],
     stopSharing: ["stop sharing"],
+    scrollUp: ["scroll up"],
+    scrollDown: ["scroll down"],
     focus1: ["focus one"],
     focus2: ["focus two"],
     focus3: ["focus three"],
@@ -49,6 +53,8 @@ struct CommandPhrases: Equatable {
     startSession: [],
     shareSession: [],
     stopSharing: [],
+    scrollUp: ["scroll up"],
+    scrollDown: ["scroll down"],
     focus1: ["focus one"],
     focus2: ["focus two"],
     focus3: ["focus three"],
@@ -69,6 +75,8 @@ struct CommandPhrases: Equatable {
     startSession: [],
     shareSession: [],
     stopSharing: [],
+    scrollUp: ["scroll up"],
+    scrollDown: ["scroll down"],
     focus1: ["focus one"],
     focus2: ["focus two"],
     focus3: ["focus three"],
@@ -89,6 +97,13 @@ struct CommandPhrases: Equatable {
       (.startSession, startSession),
       (.shareSession, shareSession),
       (.stopSharing, stopSharing),
+    ] + directMappings
+  }
+
+  var directMappings: [(ApplicationCommand, [String])] {
+    [
+      (.scrollUp, scrollUp),
+      (.scrollDown, scrollDown),
     ] + positionalMappings
   }
 
@@ -153,6 +168,8 @@ struct Configuration: Equatable {
     start_session = ["start session"]
     share_session = ["share session"]
     stop_sharing = ["stop sharing"]
+    scroll_up = ["scroll up"]
+    scroll_down = ["scroll down"]
     focus_1 = ["focus one"]
     focus_2 = ["focus two"]
     focus_3 = ["focus three"]
@@ -166,6 +183,8 @@ struct Configuration: Equatable {
     [applications.chatgpt.commands]
     focus = ["focus chat"]
     new_chat = ["new chat"]
+    scroll_up = ["scroll up"]
+    scroll_down = ["scroll down"]
     focus_1 = ["focus one"]
     focus_2 = ["focus two"]
     focus_3 = ["focus three"]
@@ -178,6 +197,8 @@ struct Configuration: Equatable {
 
     [applications.chrome.commands]
     focus = ["focus chrome"]
+    scroll_up = ["scroll up"]
+    scroll_down = ["scroll down"]
     focus_1 = ["focus one"]
     focus_2 = ["focus two"]
     focus_3 = ["focus three"]
@@ -256,6 +277,8 @@ struct Configuration: Equatable {
       startSession: raw?.startSession ?? defaults.startSession,
       shareSession: raw?.shareSession ?? defaults.shareSession,
       stopSharing: raw?.stopSharing ?? defaults.stopSharing,
+      scrollUp: raw?.scrollUp ?? defaults.scrollUp,
+      scrollDown: raw?.scrollDown ?? defaults.scrollDown,
       focus1: raw?.focus1 ?? defaults.focus1,
       focus2: raw?.focus2 ?? defaults.focus2,
       focus3: raw?.focus3 ?? defaults.focus3,
@@ -321,6 +344,8 @@ struct Configuration: Equatable {
       commands.startSession = Self.normalizedPhrases(commands.startSession)
       commands.shareSession = Self.normalizedPhrases(commands.shareSession)
       commands.stopSharing = Self.normalizedPhrases(commands.stopSharing)
+      commands.scrollUp = Self.normalizedPhrases(commands.scrollUp)
+      commands.scrollDown = Self.normalizedPhrases(commands.scrollDown)
       commands.focus1 = Self.normalizedPhrases(commands.focus1)
       commands.focus2 = Self.normalizedPhrases(commands.focus2)
       commands.focus3 = Self.normalizedPhrases(commands.focus3)
@@ -389,7 +414,7 @@ struct Configuration: Equatable {
     }
     guard let sessionTarget else {
       return globalFocusMappings
-        + ApplicationTarget.allCases.flatMap { applicationCommands[$0]!.positionalMappings }
+        + ApplicationTarget.allCases.flatMap { applicationCommands[$0]!.directMappings }
     }
     return globalFocusMappings + applicationCommands[sessionTarget]!.nonFocusMappings
   }
@@ -458,6 +483,8 @@ private struct RawCommandPhrases: Decodable {
   var startSession: [String]?
   var shareSession: [String]?
   var stopSharing: [String]?
+  var scrollUp: [String]?
+  var scrollDown: [String]?
   var focus1: [String]?
   var focus2: [String]?
   var focus3: [String]?
@@ -477,6 +504,8 @@ private struct RawCommandPhrases: Decodable {
     case startSession = "start_session"
     case shareSession = "share_session"
     case stopSharing = "stop_sharing"
+    case scrollUp = "scroll_up"
+    case scrollDown = "scroll_down"
     case focus1 = "focus_1"
     case focus2 = "focus_2"
     case focus3 = "focus_3"

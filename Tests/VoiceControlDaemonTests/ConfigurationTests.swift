@@ -329,6 +329,54 @@ import Testing
   }
 }
 
+@Test func scrollCommandsParseAfterWakePhrase() throws {
+  let configuration = try Configuration.decodeTOML(Data())
+  let mappings = configuration.commandMappings(for: .ghostty)
+
+  #expect(
+    ApplicationCommand.parse(
+      "scroll up",
+      wakePhrases: configuration.wakePhrases,
+      mappings: mappings
+    ) == .scrollUp
+  )
+  #expect(
+    ApplicationCommand.parse(
+      "scroll down",
+      wakePhrases: configuration.wakePhrases,
+      mappings: mappings
+    ) == .scrollDown
+  )
+}
+
+@Test func scrollCommandsParseFromIdle() throws {
+  let configuration = try Configuration.decodeTOML(Data())
+  let mappings = configuration.commandMappings(for: nil)
+
+  #expect(
+    ApplicationCommand.parse(
+      "scroll up",
+      wakePhrases: configuration.wakePhrases,
+      mappings: mappings
+    ) == .scrollUp
+  )
+}
+
+@Test func decodesScrollCommandPhrases() throws {
+  let configuration = try Configuration.decodeTOML(
+    Data(
+      """
+      [applications.ghostty.commands]
+      scroll_up = ["page back"]
+      scroll_down = ["page forward"]
+      """.utf8
+    )
+  )
+
+  #expect(configuration.applicationCommands[.ghostty]?.scrollUp == ["page back"])
+  #expect(configuration.applicationCommands[.ghostty]?.scrollDown == ["page forward"])
+}
+
 @Test func customCommandAliasParsesAfterWakePhrase() throws {
   let configuration = try Configuration.decodeTOML(
     Data(

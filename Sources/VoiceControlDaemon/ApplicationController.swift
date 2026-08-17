@@ -168,6 +168,15 @@ final class ApplicationController {
       return
     }
 
+    if command == .scrollUp {
+      postScrollWheel(pixels: ScrollCommand.pixelsPerStep, targetPID: targetPID, completion: completion)
+      return
+    }
+    if command == .scrollDown {
+      postScrollWheel(pixels: -ScrollCommand.pixelsPerStep, targetPID: targetPID, completion: completion)
+      return
+    }
+
     if let text = textToSubmit(for: command, target: target) {
       pasteAndSubmit(text, command: command, to: target, delay: 0, completion: completion)
       return
@@ -287,6 +296,8 @@ final class ApplicationController {
       return nil
     case .interruptSession, .startSession, .shareSession, .stopSharing:
       return nil
+    case .scrollUp, .scrollDown:
+      return nil
     case .focusItem(let number):
       let keyCodes: [Int: CGKeyCode] = [
         1: 18, 2: 19, 3: 20, 4: 21, 5: 23, 6: 22, 7: 26, 8: 28, 9: 25,
@@ -296,6 +307,74 @@ final class ApplicationController {
         target == .ghostty ? [.maskControl, .maskAlternate] : .maskCommand
       return (keyCode, flags)
     }
+  }
+
+  private func postScrollWheel(
+    pixels: Int32,
+    targetPID: pid_t?,
+    completion: @escaping (Result<Void, Error>) -> Void
+  ) {
+    guard let point = frontmostWindowCenter(targetPID: targetPID) else {
+      completion(.failure(InjectionError("Could not find the frontmost window to scroll")))
+      return
+    }
+    guard
+      let source = CGEventSource(stateID: .hidSystemState),
+      let event = CGEvent(
+        scrollWheelEvent2Source: source,
+        units: .pixel,
+        wheelCount: 1,
+        wheel1: pixels,
+        wheel2: 0,
+        wheel3: 0
+      )
+    else {
+      completion(.failure(InjectionError("Could not create the scroll event")))
+      return
+    }
+    event.location = point
+    event.post(tap: .cgSessionEventTap)
+    completion(.success(()))
+  }
+
+  private func frontmostWindowCenter(targetPID: pid_t?) -> CGPoint? {
+    guard let targetPID else { return nil }
+    guard
+      let infoList = CGWindowListCopyWindowInfo(
+        [.optionOnScreenOnly, .excludeDesktopElements],
+        kCGNullWindowID
+      ) as? [[String: Any]]
+    else {
+      return nil
+    }
+    let windows = infoList.filter { info in
+      guard (info[kCGWindowOwnerPID as String] as? Int32) == targetPID else { return false }
+      return (info[kCGWindowLayer as String] as? Int) == 0
+    }
+    guard
+      let window = windows.max(by: { Self.windowArea($0) < Self.windowArea($1) }),
+      let bounds = window[kCGWindowBounds as String] as? [String: Any],
+      let x = bounds["X"] as? CGFloat,
+      let y = bounds["Y"] as? CGFloat,
+      let width = bounds["Width"] as? CGFloat,
+      let height = bounds["Height"] as? CGFloat,
+      width > 0,
+      height > 0
+    else {
+      return nil
+    }
+    return CGPoint(x: x + width / 2, y: y + height / 2)
+  }
+
+  private static func windowArea(_ info: [String: Any]) -> CGFloat {
+    guard
+      let bounds = info[kCGWindowBounds as String] as? [String: Any],
+      let width = bounds["Width"] as? CGFloat,
+      let height = bounds["Height"] as? CGFloat
+    else {
+      return 0
+    }
+    return width * height
   }
 
   func slashCommandText(
@@ -464,6 +543,10 @@ enum SubmissionTiming {
   static func returnCount(for command: ApplicationCommand) -> Int {
     command == .stopSharing ? 2 : 1
   }
+}
+
+enum ScrollCommand {
+  static let pixelsPerStep: Int32 = 160
 }
 
 struct PreviewEdit: Equatable {

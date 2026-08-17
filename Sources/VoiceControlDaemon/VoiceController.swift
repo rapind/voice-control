@@ -275,7 +275,7 @@ final class VoiceController {
         wakePhrases: configuration.wakePhrases,
         mappings: configuration.commandMappings(for: nil)
       ),
-        command.isDirectFocusCommand
+        command.isDirectCommand
       {
         captureSessionTarget()
         if let sessionTarget,
@@ -284,9 +284,9 @@ final class VoiceController {
             wakePhrases: configuration.wakePhrases,
             mappings: configuration.commandMappings(for: sessionTarget)
           ),
-          targetCommand.isDirectFocusCommand
+          targetCommand.isDirectCommand
         {
-          print("\(sessionTarget.displayName) direct focus command detected: \(targetCommand)")
+          print("\(sessionTarget.displayName) direct command detected: \(targetCommand)")
           dispatch(.commandDetected(targetCommand))
           return
         }

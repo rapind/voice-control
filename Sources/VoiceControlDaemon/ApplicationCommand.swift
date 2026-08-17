@@ -9,6 +9,8 @@ enum ApplicationCommand: Equatable, Hashable {
   case startSession
   case shareSession
   case stopSharing
+  case scrollUp
+  case scrollDown
   case focusItem(Int)
 
   var focusTarget: ApplicationTarget? {
@@ -16,9 +18,15 @@ enum ApplicationCommand: Equatable, Hashable {
     return nil
   }
 
-  var isDirectFocusCommand: Bool {
-    guard case .focusItem(let number) = self else { return false }
-    return (1...8).contains(number)
+  var isDirectCommand: Bool {
+    switch self {
+    case .focusItem(let number):
+      return (1...8).contains(number)
+    case .scrollUp, .scrollDown:
+      return true
+    default:
+      return false
+    }
   }
 
   func target(frontmost: ApplicationTarget?) -> ApplicationTarget? {

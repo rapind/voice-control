@@ -16,11 +16,13 @@ import Testing
   }
 }
 
-@Test func directFocusCommandsAreLimitedToFirstEightItems() {
-  #expect(ApplicationCommand.focusItem(1).isDirectFocusCommand)
-  #expect(ApplicationCommand.focusItem(8).isDirectFocusCommand)
-  #expect(!ApplicationCommand.focusItem(9).isDirectFocusCommand)
-  #expect(!ApplicationCommand.newChat.isDirectFocusCommand)
+@Test func directCommandsExecuteFromIdle() {
+  #expect(ApplicationCommand.focusItem(1).isDirectCommand)
+  #expect(ApplicationCommand.focusItem(8).isDirectCommand)
+  #expect(!ApplicationCommand.focusItem(9).isDirectCommand)
+  #expect(ApplicationCommand.scrollUp.isDirectCommand)
+  #expect(ApplicationCommand.scrollDown.isDirectCommand)
+  #expect(!ApplicationCommand.newChat.isDirectCommand)
 }
 
 @Test func wakeListenerRecoversOnlyWhenIdleAudioStalls() {

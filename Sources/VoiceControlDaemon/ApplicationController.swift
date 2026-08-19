@@ -178,7 +178,8 @@ final class ApplicationController {
         completion(.success(()))
         return
       }
-      let pixels = command == .scrollUp ? ScrollCommand.pixelsPerStep : -ScrollCommand.pixelsPerStep
+      let step = ScrollCommand.pixelsPerStep(for: target)
+      let pixels = command == .scrollUp ? step : -step
       postScrollWheel(pixels: pixels, targetPID: targetPID, completion: completion)
       return
     }
@@ -302,10 +303,8 @@ final class ApplicationController {
       return nil
     case .interruptSession, .startSession, .shareSession, .stopSharing:
       return nil
-    case .scrollUp:
-      return target == .chatGPT ? (116, []) : nil
-    case .scrollDown:
-      return target == .chatGPT ? (121, []) : nil
+    case .scrollUp, .scrollDown:
+      return nil
     case .focusItem(let number):
       let keyCodes: [Int: CGKeyCode] = [
         1: 18, 2: 19, 3: 20, 4: 21, 5: 23, 6: 22, 7: 26, 8: 28, 9: 25,
@@ -554,7 +553,9 @@ enum SubmissionTiming {
 }
 
 enum ScrollCommand {
-  static let pixelsPerStep: Int32 = 160
+  static func pixelsPerStep(for target: ApplicationTarget) -> Int32 {
+    target == .chatGPT ? 670 : 160
+  }
 }
 
 struct PreviewEdit: Equatable {

@@ -61,9 +61,17 @@ final class AudioCapture {
   func start() throws {
     guard !engine.isRunning else { return }
     let input = engine.inputNode
+    let hardwareFormat = input.inputFormat(forBus: 0)
     let format = input.outputFormat(forBus: 0)
-    guard format.sampleRate > 0, format.channelCount > 0 else {
-      throw AudioCaptureError("The selected microphone has no usable input format")
+    guard
+      AudioFormatReadiness.canInstallTap(
+        hardwareSampleRate: hardwareFormat.sampleRate,
+        hardwareChannelCount: hardwareFormat.channelCount,
+        clientSampleRate: format.sampleRate,
+        clientChannelCount: format.channelCount
+      )
+    else {
+      throw AudioCaptureError("The selected microphone format is still changing")
     }
 
     // When the default input device changes (for example AirPods disconnect),
@@ -174,6 +182,20 @@ final class AudioCapture {
     let samples = UnsafeBufferPointer(start: channels[0], count: Int(buffer.frameLength))
     let meanSquare = samples.reduce(Float.zero) { $0 + ($1 * $1) } / Float(samples.count)
     return 20 * log10(max(sqrt(meanSquare), 0.000_001))
+  }
+}
+
+enum AudioFormatReadiness {
+  static func canInstallTap(
+    hardwareSampleRate: Double,
+    hardwareChannelCount: AVAudioChannelCount,
+    clientSampleRate: Double,
+    clientChannelCount: AVAudioChannelCount
+  ) -> Bool {
+    hardwareSampleRate > 0
+      && hardwareChannelCount > 0
+      && hardwareSampleRate == clientSampleRate
+      && hardwareChannelCount == clientChannelCount
   }
 }
 

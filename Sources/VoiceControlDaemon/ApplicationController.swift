@@ -168,12 +168,18 @@ final class ApplicationController {
       return
     }
 
-    if command == .scrollUp {
-      postScrollWheel(pixels: ScrollCommand.pixelsPerStep, targetPID: targetPID, completion: completion)
-      return
-    }
-    if command == .scrollDown {
-      postScrollWheel(pixels: -ScrollCommand.pixelsPerStep, targetPID: targetPID, completion: completion)
+    if command == .scrollUp || command == .scrollDown {
+      if let keyStroke = keyStroke(for: command, target: target) {
+        guard postKey(keyCode: keyStroke.keyCode, flags: keyStroke.flags) else {
+          completion(
+            .failure(InjectionError("Could not send the \(target.displayName) scroll command")))
+          return
+        }
+        completion(.success(()))
+        return
+      }
+      let pixels = command == .scrollUp ? ScrollCommand.pixelsPerStep : -ScrollCommand.pixelsPerStep
+      postScrollWheel(pixels: pixels, targetPID: targetPID, completion: completion)
       return
     }
 
@@ -296,8 +302,10 @@ final class ApplicationController {
       return nil
     case .interruptSession, .startSession, .shareSession, .stopSharing:
       return nil
-    case .scrollUp, .scrollDown:
-      return nil
+    case .scrollUp:
+      return target == .chatGPT ? (116, []) : nil
+    case .scrollDown:
+      return target == .chatGPT ? (121, []) : nil
     case .focusItem(let number):
       let keyCodes: [Int: CGKeyCode] = [
         1: 18, 2: 19, 3: 20, 4: 21, 5: 23, 6: 22, 7: 26, 8: 28, 9: 25,

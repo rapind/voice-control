@@ -21,6 +21,19 @@ import Testing
   #expect(keyStroke.flags == .maskCommand)
 }
 
+@Test func chatGPTScrollUsesPageKeys() throws {
+  let controller = ApplicationController()
+  let pageUp = try #require(controller.keyStroke(for: .scrollUp, target: .chatGPT))
+  let pageDown = try #require(controller.keyStroke(for: .scrollDown, target: .chatGPT))
+
+  #expect(pageUp.keyCode == 116)
+  #expect(pageUp.flags.isEmpty)
+  #expect(pageDown.keyCode == 121)
+  #expect(pageDown.flags.isEmpty)
+  #expect(controller.keyStroke(for: .scrollUp, target: .ghostty) == nil)
+  #expect(controller.keyStroke(for: .scrollDown, target: .chrome) == nil)
+}
+
 @Test func ghosttyContextCommandsSubmitCodexSlashCommands() {
   let controller = ApplicationController()
 

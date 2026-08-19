@@ -29,6 +29,7 @@ final class VoiceController {
   private var heardPromptSpeech = false
   private var silenceTimer: Timer?
   private var audioHealthTimer: Timer?
+  private var audioRestartWorkItem: DispatchWorkItem?
   private var lastKeywordTranscript = ""
   private var preview = TranscriptPreview()
   private var pendingPreviewText = ""
@@ -92,6 +93,8 @@ final class VoiceController {
     keywords.stop()
     audioHealthTimer?.invalidate()
     audioHealthTimer = nil
+    audioRestartWorkItem?.cancel()
+    audioRestartWorkItem = nil
     stopLiveTranscription()
     audio.stop()
   }
@@ -495,13 +498,10 @@ final class VoiceController {
     // delivering audio. Stop now and restart once the new device's format has
     // settled.
     audio.stop()
-    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
-      guard let self, self.machine.phase == .waitingForWake else { return }
-      self.restartWakeListener()
-    }
+    scheduleWakeListenerRestart(after: 0.5, attemptsRemaining: 20)
   }
 
-  private func restartWakeListener() {
+  private func restartWakeListener(attemptsRemaining: Int = 20) {
     keywords.stop()
     lastKeywordTranscript = ""
     audio.stop()
@@ -509,8 +509,29 @@ final class VoiceController {
       try audio.start()
       try keywords.start()
     } catch {
-      fail("Could not restore microphone listening: \(error.localizedDescription)")
+      guard attemptsRemaining > 0 else {
+        fail("Could not restore microphone listening: \(error.localizedDescription)")
+        return
+      }
+      logger.notice(
+        "Microphone is still reconfiguring; retrying wake listener: \(error.localizedDescription, privacy: .public)"
+      )
+      scheduleWakeListenerRestart(after: 0.25, attemptsRemaining: attemptsRemaining - 1)
     }
+  }
+
+  private func scheduleWakeListenerRestart(
+    after delay: TimeInterval,
+    attemptsRemaining: Int
+  ) {
+    audioRestartWorkItem?.cancel()
+    let workItem = DispatchWorkItem { [weak self] in
+      guard let self, self.machine.phase == .waitingForWake else { return }
+      self.audioRestartWorkItem = nil
+      self.restartWakeListener(attemptsRemaining: attemptsRemaining)
+    }
+    audioRestartWorkItem = workItem
+    DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: workItem)
   }
 
   private func applyPendingConfiguration() -> Bool {

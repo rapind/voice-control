@@ -35,6 +35,8 @@ The local build uses a stable identifier-based designated requirement so macOS c
 ./run-prototype.sh
 ```
 
+The script rebuilds and replaces the same app bundle under `~/Applications`, then launches it. It does not leave a second development app registered with macOS.
+
 The editable configuration lives at:
 
 ```text
@@ -143,4 +145,3 @@ The configured submit phrase creates an audio cutoff. The phrase itself and anyt
 - Model downloading and Hugging Face authentication are deliberately out of scope for the Parakeet fallback. It fails clearly when the shared cached model is missing. Apple Speech assets are installed through `AssetInventory`.
 - Silence detection uses a configurable RMS threshold, not a neural VAD.
 - The app is ad-hoc signed with a stable identifier-only designated requirement. This avoids a paid Apple developer account and should preserve Accessibility approval across local rebuilds. It is appropriate for this private local tool, but weaker than certificate-backed signing because another local app using the same bundle identifier could satisfy the requirement.
-

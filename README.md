@@ -78,6 +78,7 @@ focus_9 = ["focus nine"]
 [applications.chatgpt.commands]
 focus = ["focus chat"]
 new_chat = ["new chat"]
+scroll_end = ["scroll end"]
 focus_1 = ["focus one"]
 focus_2 = ["focus two"]
 focus_3 = ["focus three"]
@@ -128,6 +129,8 @@ Ghostty, ChatGPT, and Chrome support:
 - `focus one` through `focus nine` after a wake phrase
 - `scroll up` and `scroll down` after a wake phrase
 - Their global application focus phrase
+
+ChatGPT also supports `scroll end`, which jumps toward the latest generated output.
 
 For Ghostty, `new chat` opens a new tab, types `codex`, and presses Return. `clear context` sends `/clear`, and `compact context` sends `/compact`; both press Return. `quit session` sends Control-D to the foreground terminal process. `start session` types `omp` and presses Return. `share session` sends `/collab` and `stop sharing` sends `/collab stop`, each followed by Return. Numbered focus commands send Control+Option+1 through Control+Option+9, matching the recommended Herdr workspace bindings. For ChatGPT, `new chat` sends Command-N. Chrome does not define a `new chat` command. Numbered focus commands in ChatGPT and Chrome send Command-1 through Command-9.
 

@@ -12,6 +12,7 @@ struct CommandPhrases: Equatable {
   var stopSharing: [String]
   var scrollUp: [String]
   var scrollDown: [String]
+  var scrollEnd: [String]
   var focus1: [String]
   var focus2: [String]
   var focus3: [String]
@@ -33,6 +34,7 @@ struct CommandPhrases: Equatable {
     stopSharing: ["stop sharing"],
     scrollUp: ["scroll up"],
     scrollDown: ["scroll down"],
+    scrollEnd: [],
     focus1: ["focus one"],
     focus2: ["focus two"],
     focus3: ["focus three"],
@@ -55,6 +57,7 @@ struct CommandPhrases: Equatable {
     stopSharing: [],
     scrollUp: ["scroll up"],
     scrollDown: ["scroll down"],
+    scrollEnd: ["scroll end"],
     focus1: ["focus one"],
     focus2: ["focus two"],
     focus3: ["focus three"],
@@ -77,6 +80,7 @@ struct CommandPhrases: Equatable {
     stopSharing: [],
     scrollUp: ["scroll up"],
     scrollDown: ["scroll down"],
+    scrollEnd: [],
     focus1: ["focus one"],
     focus2: ["focus two"],
     focus3: ["focus three"],
@@ -104,6 +108,7 @@ struct CommandPhrases: Equatable {
     [
       (.scrollUp, scrollUp),
       (.scrollDown, scrollDown),
+      (.scrollEnd, scrollEnd),
     ] + positionalMappings
   }
 
@@ -185,6 +190,7 @@ struct Configuration: Equatable {
     new_chat = ["new chat"]
     scroll_up = ["scroll up"]
     scroll_down = ["scroll down"]
+    scroll_end = ["scroll end"]
     focus_1 = ["focus one"]
     focus_2 = ["focus two"]
     focus_3 = ["focus three"]
@@ -279,6 +285,7 @@ struct Configuration: Equatable {
       stopSharing: raw?.stopSharing ?? defaults.stopSharing,
       scrollUp: raw?.scrollUp ?? defaults.scrollUp,
       scrollDown: raw?.scrollDown ?? defaults.scrollDown,
+      scrollEnd: raw?.scrollEnd ?? defaults.scrollEnd,
       focus1: raw?.focus1 ?? defaults.focus1,
       focus2: raw?.focus2 ?? defaults.focus2,
       focus3: raw?.focus3 ?? defaults.focus3,
@@ -346,6 +353,7 @@ struct Configuration: Equatable {
       commands.stopSharing = Self.normalizedPhrases(commands.stopSharing)
       commands.scrollUp = Self.normalizedPhrases(commands.scrollUp)
       commands.scrollDown = Self.normalizedPhrases(commands.scrollDown)
+      commands.scrollEnd = Self.normalizedPhrases(commands.scrollEnd)
       commands.focus1 = Self.normalizedPhrases(commands.focus1)
       commands.focus2 = Self.normalizedPhrases(commands.focus2)
       commands.focus3 = Self.normalizedPhrases(commands.focus3)
@@ -370,6 +378,11 @@ struct Configuration: Equatable {
         throw ConfigurationError(
           "\(target.displayName) does not support context or session commands"
         )
+      }
+    }
+    for target in [ApplicationTarget.ghostty, .chrome] {
+      guard applicationCommands[target]!.scrollEnd.isEmpty else {
+        throw ConfigurationError("\(target.displayName) does not support scroll end")
       }
     }
 
@@ -485,6 +498,7 @@ private struct RawCommandPhrases: Decodable {
   var stopSharing: [String]?
   var scrollUp: [String]?
   var scrollDown: [String]?
+  var scrollEnd: [String]?
   var focus1: [String]?
   var focus2: [String]?
   var focus3: [String]?
@@ -506,6 +520,7 @@ private struct RawCommandPhrases: Decodable {
     case stopSharing = "stop_sharing"
     case scrollUp = "scroll_up"
     case scrollDown = "scroll_down"
+    case scrollEnd = "scroll_end"
     case focus1 = "focus_1"
     case focus2 = "focus_2"
     case focus3 = "focus_3"

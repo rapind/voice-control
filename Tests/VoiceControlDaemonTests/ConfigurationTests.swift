@@ -362,6 +362,25 @@ import Testing
   )
 }
 
+@Test func scrollEndIsAChatGPTOnlyDirectCommand() throws {
+  let configuration = try Configuration.decodeTOML(Data())
+
+  #expect(
+    ApplicationCommand.parse(
+      "scroll end",
+      wakePhrases: configuration.wakePhrases,
+      mappings: configuration.commandMappings(for: .chatGPT)
+    ) == .scrollEnd
+  )
+  #expect(
+    ApplicationCommand.parse(
+      "scroll end",
+      wakePhrases: configuration.wakePhrases,
+      mappings: configuration.commandMappings(for: .ghostty)
+    ) == nil
+  )
+}
+
 @Test func decodesScrollCommandPhrases() throws {
   let configuration = try Configuration.decodeTOML(
     Data(

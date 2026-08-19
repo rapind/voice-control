@@ -168,7 +168,7 @@ final class ApplicationController {
       return
     }
 
-    if command == .scrollUp || command == .scrollDown {
+    if command == .scrollUp || command == .scrollDown || command == .scrollEnd {
       if let keyStroke = keyStroke(for: command, target: target) {
         guard postKey(keyCode: keyStroke.keyCode, flags: keyStroke.flags) else {
           completion(
@@ -178,8 +178,13 @@ final class ApplicationController {
         completion(.success(()))
         return
       }
-      let step = ScrollCommand.pixelsPerStep(for: target)
-      let pixels = command == .scrollUp ? step : -step
+      let pixels: Int32
+      if command == .scrollEnd {
+        pixels = -ScrollCommand.pixelsToEnd
+      } else {
+        let step = ScrollCommand.pixelsPerStep(for: target)
+        pixels = command == .scrollUp ? step : -step
+      }
       postScrollWheel(pixels: pixels, targetPID: targetPID, completion: completion)
       return
     }
@@ -303,7 +308,7 @@ final class ApplicationController {
       return nil
     case .interruptSession, .startSession, .shareSession, .stopSharing:
       return nil
-    case .scrollUp, .scrollDown:
+    case .scrollUp, .scrollDown, .scrollEnd:
       return nil
     case .focusItem(let number):
       let keyCodes: [Int: CGKeyCode] = [
@@ -553,6 +558,8 @@ enum SubmissionTiming {
 }
 
 enum ScrollCommand {
+  static let pixelsToEnd: Int32 = 3_000
+
   static func pixelsPerStep(for target: ApplicationTarget) -> Int32 {
     target == .chatGPT ? 670 : 160
   }

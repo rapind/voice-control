@@ -22,12 +22,21 @@ import Testing
   #expect(!ApplicationCommand.focusItem(9).isDirectCommand)
   #expect(ApplicationCommand.scrollUp.isDirectCommand)
   #expect(ApplicationCommand.scrollDown.isDirectCommand)
+  #expect(ApplicationCommand.scrollEnd.isDirectCommand)
   #expect(!ApplicationCommand.newChat.isDirectCommand)
 }
 
 @Test func wakeListenerRecoversOnlyWhenIdleAudioStalls() {
-  #expect(WakeListenerHealth.shouldRecover(phase: .waitingForWake, audioIsRunning: false, isReceivingAudio: true))
-  #expect(WakeListenerHealth.shouldRecover(phase: .waitingForWake, audioIsRunning: true, isReceivingAudio: false))
-  #expect(!WakeListenerHealth.shouldRecover(phase: .waitingForWake, audioIsRunning: true, isReceivingAudio: true))
-  #expect(!WakeListenerHealth.shouldRecover(phase: .recording, audioIsRunning: false, isReceivingAudio: true))
+  #expect(
+    WakeListenerHealth.shouldRecover(
+      phase: .waitingForWake, audioIsRunning: false, isReceivingAudio: true))
+  #expect(
+    WakeListenerHealth.shouldRecover(
+      phase: .waitingForWake, audioIsRunning: true, isReceivingAudio: false))
+  #expect(
+    !WakeListenerHealth.shouldRecover(
+      phase: .waitingForWake, audioIsRunning: true, isReceivingAudio: true))
+  #expect(
+    !WakeListenerHealth.shouldRecover(
+      phase: .recording, audioIsRunning: false, isReceivingAudio: true))
 }

@@ -11,6 +11,7 @@ enum ApplicationCommand: Equatable, Hashable {
   case stopSharing
   case scrollUp
   case scrollDown
+  case scrollEnd
   case focusItem(Int)
 
   var focusTarget: ApplicationTarget? {
@@ -22,7 +23,7 @@ enum ApplicationCommand: Equatable, Hashable {
     switch self {
     case .focusItem(let number):
       return (1...8).contains(number)
-    case .scrollUp, .scrollDown:
+    case .scrollUp, .scrollDown, .scrollEnd:
       return true
     default:
       return false

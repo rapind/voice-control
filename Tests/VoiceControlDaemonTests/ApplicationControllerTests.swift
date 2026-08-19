@@ -29,6 +29,7 @@ import Testing
   #expect(ScrollCommand.pixelsPerStep(for: .chrome) == 160)
   #expect(controller.keyStroke(for: .scrollUp, target: .chatGPT) == nil)
   #expect(controller.keyStroke(for: .scrollDown, target: .chatGPT) == nil)
+  #expect(ScrollCommand.pixelsToEnd == 3_000)
 }
 
 @Test func ghosttyContextCommandsSubmitCodexSlashCommands() {

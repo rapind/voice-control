@@ -55,6 +55,7 @@ vocabulary = ["bean"]
 silence_seconds = 4
 silence_threshold_db = -45
 maximum_recording_seconds = 90
+voice_processing = false
 
 [applications.ghostty.commands]
 focus = ["focus ghost tee"]
@@ -149,5 +150,6 @@ The configured submit phrase creates an audio cutoff. The phrase itself and anyt
 - Apple Speech preview results may revise earlier words until stream finalization. The Parakeet fallback updates about every 1.5 seconds and replaces its preview with the final full-context pass.
 - Live preview typing stops rather than sending text to an application that is no longer frontmost.
 - Model downloading and Hugging Face authentication are deliberately out of scope for the Parakeet fallback. It fails clearly when the shared cached model is missing. Apple Speech assets are installed through `AssetInventory`.
-- Silence detection uses a configurable RMS threshold, not a neural VAD.
+- Apple voice processing can be enabled with `voice_processing = true`, but it is disabled by default because its call-oriented filtering weakens far-field dictation. When enabled, its multichannel device output is normalized to mono before recognition and recording.
+- Silence detection measures the processed room noise while waiting for the wake phrase and sets its speech threshold 8 dB above that floor. `silence_threshold_db` is used until calibration completes.
 - The app is ad-hoc signed with a stable identifier-only designated requirement. This avoids a paid Apple developer account and should preserve Accessibility approval across local rebuilds. It is appropriate for this private local tool, but weaker than certificate-backed signing because another local app using the same bundle identifier could satisfy the requirement.

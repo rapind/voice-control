@@ -42,6 +42,7 @@ final class KeywordListener {
     let request = SFSpeechAudioBufferRecognitionRequest()
     request.shouldReportPartialResults = true
     request.requiresOnDeviceRecognition = recognizer.supportsOnDeviceRecognition
+    request.taskHint = .confirmation
     request.contextualStrings = contextualStrings
     if #available(macOS 15.0, *) {
       request.addsPunctuation = false

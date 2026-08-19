@@ -3,6 +3,7 @@
 .swiftpm/
 DerivedData/
 *.xcuserstate
+.diagnostics/
 
 # Local credentials and signing material
 .env

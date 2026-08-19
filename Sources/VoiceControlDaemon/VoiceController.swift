@@ -8,7 +8,7 @@ final class VoiceController {
 
   private var configuration: Configuration
   private var pendingConfiguration: Configuration?
-  private let audio = AudioCapture()
+  private let audio: AudioCapture
   private let keywords: KeywordListener
   private let applicationController = ApplicationController()
   private let transcriber: PromptTranscriber
@@ -34,9 +34,11 @@ final class VoiceController {
   private var preview = TranscriptPreview()
   private var pendingPreviewText = ""
   private var previewReady = false
+  private var ambientNoiseFloor = AmbientNoiseFloor()
 
   init(configuration: Configuration) {
     self.configuration = configuration
+    self.audio = AudioCapture(voiceProcessingEnabled: configuration.voiceProcessingEnabled)
     self.transcriber = PromptTranscriber(contextualStrings: configuration.contextualPhrases)
     self.keywords = KeywordListener(contextualStrings: configuration.contextualPhrases)
 
@@ -48,13 +50,8 @@ final class VoiceController {
       liveAudioRouter.appendCopy(of: buffer)
     }
     audio.onLevel = { [weak self] db in
-      guard db >= (self?.configuration.silenceThresholdDB ?? -45) else { return }
       DispatchQueue.main.async {
-        guard let self, self.machine.phase == .recording, Date() >= self.ignoreSilenceUntil else {
-          return
-        }
-        self.heardPromptSpeech = true
-        self.lastSpeechAt = Date()
+        self?.handleAudioLevel(db)
       }
     }
     audio.onConfigurationChange = { [weak self] in
@@ -175,6 +172,7 @@ final class VoiceController {
       ignoreSilenceUntil = Date().addingTimeInterval(0.6)
       lastSpeechAt = ignoreSilenceUntil
       submitTailDuration = nil
+      heardPromptSpeech = false
       preview = TranscriptPreview()
       pendingPreviewText = ""
       previewReady = targetPID != nil
@@ -363,6 +361,34 @@ final class VoiceController {
     applyPendingPreview()
   }
 
+  private func handleAudioLevel(_ levelDB: Float) {
+    switch machine.phase {
+    case .waitingForWake:
+      let wasCalibrated = ambientNoiseFloor.isCalibrated
+      ambientNoiseFloor.observe(levelDB)
+      if !wasCalibrated, ambientNoiseFloor.isCalibrated,
+        let estimateDB = ambientNoiseFloor.estimateDB
+      {
+        let thresholdDB = ambientNoiseFloor.speechThreshold(
+          fallback: configuration.silenceThresholdDB
+        )
+        logger.notice(
+          "Ambient noise calibrated floor=\(estimateDB, privacy: .public)dBFS speech-threshold=\(thresholdDB, privacy: .public)dBFS"
+        )
+      }
+    case .recording:
+      guard Date() >= ignoreSilenceUntil else { return }
+      let thresholdDB = ambientNoiseFloor.speechThreshold(
+        fallback: configuration.silenceThresholdDB
+      )
+      guard levelDB >= thresholdDB else { return }
+      heardPromptSpeech = true
+      lastSpeechAt = Date()
+    default:
+      break
+    }
+  }
+
   private func applyPendingPreview() {
     guard machine.phase == .recording, previewReady else { return }
     var nextPreview = preview
@@ -499,6 +525,7 @@ final class VoiceController {
     // installed with a stale format, which leaves the engine running without
     // delivering audio. Stop now and restart once the new device's format has
     // settled.
+    ambientNoiseFloor = AmbientNoiseFloor()
     audio.stop()
     scheduleWakeListenerRestart(after: 0.5, attemptsRemaining: 20)
   }
@@ -541,8 +568,25 @@ final class VoiceController {
 
   private func applyPendingConfiguration() -> Bool {
     guard let updated = pendingConfiguration else { return true }
+    let previous = configuration
+    let voiceProcessingChanged =
+      updated.voiceProcessingEnabled != previous.voiceProcessingEnabled
+    let audioWasRunning = audio.isRunning
+    let keywordsWereListening = keywords.isListening
     do {
+      if voiceProcessingChanged {
+        keywords.stop()
+        audio.stop()
+        audio.setVoiceProcessingEnabled(updated.voiceProcessingEnabled)
+        ambientNoiseFloor = AmbientNoiseFloor()
+      }
       try keywords.updateContextualStrings(updated.contextualPhrases)
+      if voiceProcessingChanged, audioWasRunning {
+        try audio.start()
+        if keywordsWereListening {
+          try keywords.start()
+        }
+      }
       configuration = updated
       Task { [transcriber] in
         await transcriber.updateContextualStrings(updated.contextualPhrases)
@@ -552,6 +596,12 @@ final class VoiceController {
       onConfigurationChanged?(updated)
       return true
     } catch {
+      if voiceProcessingChanged {
+        keywords.stop()
+        audio.stop()
+        audio.setVoiceProcessingEnabled(previous.voiceProcessingEnabled)
+        try? keywords.updateContextualStrings(previous.contextualPhrases)
+      }
       pendingConfiguration = nil
       fail("Could not apply the reloaded configuration: \(error.localizedDescription)")
       return false
@@ -604,6 +654,8 @@ final class VoiceController {
     print(
       "  silence fallback: \(configuration.silenceSeconds)s at \(configuration.silenceThresholdDB)dBFS"
     )
+    print(
+      "  Apple voice processing: \(configuration.voiceProcessingEnabled ? "enabled" : "disabled")")
     print("  transcription: \(transcriber.name)")
   }
 }

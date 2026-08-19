@@ -141,6 +141,7 @@ struct Configuration: Equatable {
   var silenceSeconds: TimeInterval
   var silenceThresholdDB: Float
   var maximumRecordingSeconds: TimeInterval
+  var voiceProcessingEnabled: Bool
   var applicationCommands: [ApplicationTarget: CommandPhrases]
 
   static let defaults = Configuration(
@@ -151,6 +152,7 @@ struct Configuration: Equatable {
     silenceSeconds: 4,
     silenceThresholdDB: -45,
     maximumRecordingSeconds: 90,
+    voiceProcessingEnabled: false,
     applicationCommands: [
       .ghostty: .ghosttyDefaults,
       .chatGPT: .chatGPTDefaults,
@@ -168,6 +170,7 @@ struct Configuration: Equatable {
     silence_seconds = 4
     silence_threshold_db = -45
     maximum_recording_seconds = 90
+    voice_processing = false
 
     [applications.ghostty.commands]
     focus = ["focus ghost tee"]
@@ -260,6 +263,7 @@ struct Configuration: Equatable {
       silenceThresholdDB: Float(raw.silenceThresholdDB ?? Double(defaults.silenceThresholdDB)),
       maximumRecordingSeconds: raw.maximumRecordingSeconds
         ?? defaults.maximumRecordingSeconds,
+      voiceProcessingEnabled: raw.voiceProcessingEnabled ?? defaults.voiceProcessingEnabled,
       applicationCommands: [
         .ghostty: commandPhrases(
           raw.applications?.ghostty?.commands,
@@ -473,6 +477,7 @@ private struct RawConfiguration: Decodable {
   var silenceSeconds: Double?
   var silenceThresholdDB: Double?
   var maximumRecordingSeconds: Double?
+  var voiceProcessingEnabled: Bool?
   var applications: RawApplications?
   var commands: RawCommandPhrases?
 
@@ -481,6 +486,7 @@ private struct RawConfiguration: Decodable {
     case silenceSeconds = "silence_seconds"
     case silenceThresholdDB = "silence_threshold_db"
     case maximumRecordingSeconds = "maximum_recording_seconds"
+    case voiceProcessingEnabled = "voice_processing"
   }
 }
 

@@ -329,6 +329,7 @@ import Testing
       silence_seconds = 6.5
       silence_threshold_db = -38
       maximum_recording_seconds = 120
+      voice_processing = true
 
       [applications.ghostty.commands]
       new_chat = ["make a chat"]
@@ -342,8 +343,15 @@ import Testing
   #expect(configuration.silenceSeconds == 6.5)
   #expect(configuration.silenceThresholdDB == -38)
   #expect(configuration.maximumRecordingSeconds == 120)
+  #expect(configuration.voiceProcessingEnabled)
   #expect(configuration.applicationCommands[.ghostty]?.newChat == ["make a chat"])
   #expect(configuration.applicationCommands[.ghostty]?.focus1 == ["focus one", "folk one"])
+}
+
+@Test func disablesVoiceProcessingByDefault() throws {
+  let configuration = try Configuration.decodeTOML(Data())
+
+  #expect(!configuration.voiceProcessingEnabled)
 }
 
 @Test func rejectsPhraseCollisionAcrossActions() throws {

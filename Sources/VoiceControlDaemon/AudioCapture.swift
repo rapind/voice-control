@@ -23,8 +23,10 @@ final class AudioCapture {
   private var lastBufferReceivedAt: Date?
   private var loggedFirstBuffer = false
   private var configurationChangeObserver: NSObjectProtocol?
+  private var voiceProcessingEnabled: Bool
 
-  init() {
+  init(voiceProcessingEnabled: Bool = false) {
+    self.voiceProcessingEnabled = voiceProcessingEnabled
     configurationChangeObserver = NotificationCenter.default.addObserver(
       forName: .AVAudioEngineConfigurationChange,
       object: engine,
@@ -43,6 +45,11 @@ final class AudioCapture {
   }
 
   var isRunning: Bool { engine.isRunning }
+
+  func setVoiceProcessingEnabled(_ enabled: Bool) {
+    precondition(!engine.isRunning, "Voice processing can only change while audio is stopped")
+    voiceProcessingEnabled = enabled
+  }
 
   /// True when audio buffers have arrived recently. A running engine that is
   /// not delivering buffers means the tap failed to install, for example when
@@ -70,6 +77,13 @@ final class AudioCapture {
   func start() throws {
     guard !engine.isRunning else { return }
     let input = engine.inputNode
+    if input.isVoiceProcessingEnabled != voiceProcessingEnabled {
+      try input.setVoiceProcessingEnabled(voiceProcessingEnabled)
+      let state = voiceProcessingEnabled ? "enabled" : "disabled"
+      logger.notice(
+        "Apple voice processing \(state, privacy: .public)"
+      )
+    }
     let hardwareFormat = input.inputFormat(forBus: 0)
     let clientFormat = input.outputFormat(forBus: 0)
     guard
@@ -95,11 +109,23 @@ final class AudioCapture {
     }
 
     if !tapInstalled {
+      let deliveryFormat = formatPlan.recordingFormat
       input.installTap(onBus: 0, bufferSize: 512, format: formatPlan.tapFormat) {
         [weak self] buffer, _ in
         guard let self else { return }
-        let level = Self.rmsDB(buffer)
-        let duration = Double(buffer.frameLength) / buffer.format.sampleRate
+        guard
+          let deliveryBuffer = AudioCaptureBufferNormalizer.normalize(
+            buffer,
+            outputFormat: deliveryFormat
+          )
+        else {
+          self.logger.error(
+            "Could not normalize \(buffer.format.channelCount, privacy: .public)-channel audio for speech recognition"
+          )
+          return
+        }
+        let level = Self.rmsDB(deliveryBuffer)
+        let duration = Double(deliveryBuffer.frameLength) / deliveryBuffer.format.sampleRate
 
         self.lock.lock()
         let shouldLogFirstBuffer = !self.loggedFirstBuffer
@@ -110,7 +136,7 @@ final class AudioCapture {
         let file = self.recordingFile
         if let file {
           do {
-            try file.write(from: buffer)
+            try file.write(from: deliveryBuffer)
           } catch {
             // The controller catches an unusable recording when transcription starts.
           }
@@ -119,12 +145,12 @@ final class AudioCapture {
 
         if shouldLogFirstBuffer {
           self.logger.notice(
-            "Audio buffers started format=\(buffer.format.sampleRate, privacy: .public)Hz/\(buffer.format.channelCount, privacy: .public)ch"
+            "Audio buffers started source=\(buffer.format.sampleRate, privacy: .public)Hz/\(buffer.format.channelCount, privacy: .public)ch delivery=\(deliveryBuffer.format.sampleRate, privacy: .public)Hz/\(deliveryBuffer.format.channelCount, privacy: .public)ch"
           )
         }
-        self.onBuffer?(buffer, bufferStartTime)
+        self.onBuffer?(deliveryBuffer, bufferStartTime)
         if file != nil {
-          self.onRecordingBuffer?(buffer)
+          self.onRecordingBuffer?(deliveryBuffer)
         }
         self.onLevel?(level)
       }
@@ -209,6 +235,32 @@ final class AudioCapture {
   }
 }
 
+struct AmbientNoiseFloor {
+  private(set) var estimateDB: Float?
+  private(set) var sampleCount = 0
+
+  var isCalibrated: Bool { sampleCount >= 50 }
+
+  mutating func observe(_ levelDB: Float) {
+    guard levelDB.isFinite, (-120...0).contains(levelDB) else { return }
+    sampleCount += 1
+    guard let estimateDB else {
+      self.estimateDB = levelDB
+      return
+    }
+
+    // Follow quieter samples quickly, but let the estimate rise very slowly.
+    // Speech therefore does not become part of the measured room noise floor.
+    let smoothing: Float = levelDB < estimateDB ? 0.2 : 0.002
+    self.estimateDB = estimateDB + smoothing * (levelDB - estimateDB)
+  }
+
+  func speechThreshold(fallback: Float) -> Float {
+    guard isCalibrated, let estimateDB else { return fallback }
+    return min(-25, max(-65, estimateDB + 8))
+  }
+}
+
 struct AudioCaptureFormatPlan {
   let tapFormat: AVAudioFormat
   let recordingFormat: AVAudioFormat
@@ -225,10 +277,57 @@ struct AudioCaptureFormatPlan {
     else {
       return nil
     }
+    let recordingFormat: AVAudioFormat
+    if hardwareFormat.channelCount == 1 {
+      recordingFormat = hardwareFormat
+    } else {
+      guard
+        let monoFormat = AVAudioFormat(
+          standardFormatWithSampleRate: hardwareFormat.sampleRate,
+          channels: 1
+        )
+      else {
+        return nil
+      }
+      recordingFormat = monoFormat
+    }
     return AudioCaptureFormatPlan(
       tapFormat: hardwareFormat,
-      recordingFormat: hardwareFormat
+      recordingFormat: recordingFormat
     )
+  }
+}
+
+enum AudioCaptureBufferNormalizer {
+  static func normalize(
+    _ input: AVAudioPCMBuffer,
+    outputFormat: AVAudioFormat
+  ) -> AVAudioPCMBuffer? {
+    guard
+      outputFormat.channelCount == 1,
+      input.format.sampleRate == outputFormat.sampleRate,
+      let sourceChannels = input.floatChannelData
+    else {
+      return nil
+    }
+    if input.format.channelCount == 1 {
+      return input
+    }
+    guard
+      let output = AVAudioPCMBuffer(
+        pcmFormat: outputFormat,
+        frameCapacity: input.frameLength
+      ),
+      let destinationChannels = output.floatChannelData
+    else {
+      return nil
+    }
+    output.frameLength = input.frameLength
+    destinationChannels[0].update(
+      from: sourceChannels[0],
+      count: Int(input.frameLength)
+    )
+    return output
   }
 }
 

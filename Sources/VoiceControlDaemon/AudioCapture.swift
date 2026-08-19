@@ -1,5 +1,6 @@
 import AVFoundation
 import Foundation
+import OSLog
 
 final class AudioCapture {
   var onBuffer: ((AVAudioPCMBuffer, TimeInterval) -> Void)?
@@ -9,12 +10,18 @@ final class AudioCapture {
 
   private let engine = AVAudioEngine()
   private let lock = NSLock()
+  private let logger = Logger(
+    subsystem: "com.daverapin.voice-control-prototype",
+    category: "AudioCapture"
+  )
   private var recordingFile: AVAudioFile?
   private var recordingURL: URL?
   private var totalCapturedTime: TimeInterval = 0
   private var tapInstalled = false
   private var tapFormat: AVAudioFormat?
+  private var recordingFormat: AVAudioFormat?
   private var lastBufferReceivedAt: Date?
+  private var loggedFirstBuffer = false
   private var configurationChangeObserver: NSObjectProtocol?
 
   init() {
@@ -23,7 +30,9 @@ final class AudioCapture {
       object: engine,
       queue: .main
     ) { [weak self] _ in
-      self?.onConfigurationChange?()
+      guard let self else { return }
+      self.logger.notice("Audio engine configuration changed")
+      self.onConfigurationChange?()
     }
   }
 
@@ -62,35 +71,39 @@ final class AudioCapture {
     guard !engine.isRunning else { return }
     let input = engine.inputNode
     let hardwareFormat = input.inputFormat(forBus: 0)
-    let format = input.outputFormat(forBus: 0)
+    let clientFormat = input.outputFormat(forBus: 0)
     guard
-      AudioFormatReadiness.canInstallTap(
-        hardwareSampleRate: hardwareFormat.sampleRate,
-        hardwareChannelCount: hardwareFormat.channelCount,
-        clientSampleRate: format.sampleRate,
-        clientChannelCount: format.channelCount
+      let formatPlan = AudioCaptureFormatPlan.make(
+        hardwareFormat: hardwareFormat,
+        clientFormat: clientFormat
       )
     else {
       throw AudioCaptureError("The selected microphone has no usable input format")
     }
+    logger.notice(
+      "Starting audio capture hardware=\(hardwareFormat.sampleRate, privacy: .public)Hz/\(hardwareFormat.channelCount, privacy: .public)ch client=\(clientFormat.sampleRate, privacy: .public)Hz/\(clientFormat.channelCount, privacy: .public)ch tap=\(formatPlan.tapFormat.sampleRate, privacy: .public)Hz/\(formatPlan.tapFormat.channelCount, privacy: .public)ch"
+    )
 
     // When the default input device changes (for example AirPods disconnect),
     // the hardware format changes with it. A tap installed for the old format
     // would stop the engine from starting, so reinstall it against the current
     // format whenever the two no longer match.
-    if tapInstalled, !matchesTapFormat(format) {
+    if tapInstalled, !matchesTapFormat(formatPlan.tapFormat) {
       input.removeTap(onBus: 0)
       tapInstalled = false
       tapFormat = nil
     }
 
     if !tapInstalled {
-      input.installTap(onBus: 0, bufferSize: 512, format: format) { [weak self] buffer, _ in
+      input.installTap(onBus: 0, bufferSize: 512, format: formatPlan.tapFormat) {
+        [weak self] buffer, _ in
         guard let self else { return }
         let level = Self.rmsDB(buffer)
         let duration = Double(buffer.frameLength) / buffer.format.sampleRate
 
         self.lock.lock()
+        let shouldLogFirstBuffer = !self.loggedFirstBuffer
+        self.loggedFirstBuffer = true
         let bufferStartTime = self.totalCapturedTime
         self.totalCapturedTime += duration
         self.lastBufferReceivedAt = Date()
@@ -104,18 +117,25 @@ final class AudioCapture {
         }
         self.lock.unlock()
 
+        if shouldLogFirstBuffer {
+          self.logger.notice(
+            "Audio buffers started format=\(buffer.format.sampleRate, privacy: .public)Hz/\(buffer.format.channelCount, privacy: .public)ch"
+          )
+        }
         self.onBuffer?(buffer, bufferStartTime)
         if file != nil {
           self.onRecordingBuffer?(buffer)
         }
         self.onLevel?(level)
       }
-      tapFormat = format
+      tapFormat = formatPlan.tapFormat
       tapInstalled = true
     }
+    recordingFormat = formatPlan.recordingFormat
 
     engine.prepare()
     try engine.start()
+    logger.notice("Audio engine started")
   }
 
   func beginRecording() throws {
@@ -123,7 +143,9 @@ final class AudioCapture {
       .appendingPathComponent("voice-control-prototype", isDirectory: true)
     try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
     let url = directory.appendingPathComponent("prompt-\(UUID().uuidString).wav")
-    let format = engine.inputNode.outputFormat(forBus: 0)
+    guard let format = recordingFormat else {
+      throw AudioCaptureError("Audio capture has no active tap format")
+    }
     let file = try AVAudioFile(forWriting: url, settings: format.settings)
 
     lock.lock()
@@ -153,12 +175,14 @@ final class AudioCapture {
     lock.lock()
     recordingFile = nil
     recordingURL = nil
+    loggedFirstBuffer = false
     lock.unlock()
     if tapInstalled {
       engine.inputNode.removeTap(onBus: 0)
       tapInstalled = false
       tapFormat = nil
     }
+    recordingFormat = nil
     engine.stop()
   }
 
@@ -185,17 +209,26 @@ final class AudioCapture {
   }
 }
 
-enum AudioFormatReadiness {
-  static func canInstallTap(
-    hardwareSampleRate: Double,
-    hardwareChannelCount: AVAudioChannelCount,
-    clientSampleRate: Double,
-    clientChannelCount: AVAudioChannelCount
-  ) -> Bool {
-    hardwareSampleRate > 0
-      && hardwareChannelCount > 0
-      && clientSampleRate > 0
-      && hardwareChannelCount == clientChannelCount
+struct AudioCaptureFormatPlan {
+  let tapFormat: AVAudioFormat
+  let recordingFormat: AVAudioFormat
+
+  static func make(
+    hardwareFormat: AVAudioFormat,
+    clientFormat: AVAudioFormat
+  ) -> AudioCaptureFormatPlan? {
+    guard
+      hardwareFormat.sampleRate > 0,
+      hardwareFormat.channelCount > 0,
+      clientFormat.sampleRate > 0,
+      clientFormat.channelCount > 0
+    else {
+      return nil
+    }
+    return AudioCaptureFormatPlan(
+      tapFormat: hardwareFormat,
+      recordingFormat: hardwareFormat
+    )
   }
 }
 

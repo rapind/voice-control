@@ -493,6 +493,7 @@ final class VoiceController {
 
   private func handleAudioConfigurationChange() {
     guard machine.phase == .waitingForWake else { return }
+    logger.notice("Audio route changed; scheduling wake listener restart")
     // The engine reconfigures asynchronously when the input device changes.
     // Restarting immediately races that reconfiguration: the tap can be
     // installed with a stale format, which leaves the engine running without
@@ -503,6 +504,9 @@ final class VoiceController {
   }
 
   private func restartWakeListener(attemptsRemaining: Int = 20) {
+    logger.notice(
+      "Restarting wake listener; attempts remaining: \(attemptsRemaining, privacy: .public)"
+    )
     keywords.stop()
     lastKeywordTranscript = ""
     audio.stop()

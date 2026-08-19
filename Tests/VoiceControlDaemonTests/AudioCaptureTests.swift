@@ -1,22 +1,21 @@
+import AVFoundation
 import Testing
 
 @testable import VoiceControlDaemon
 
-@Test func audioTapAllowsCoreAudioSampleRateConversion() {
-  #expect(
-    AudioFormatReadiness.canInstallTap(
-      hardwareSampleRate: 24_000,
-      hardwareChannelCount: 1,
-      clientSampleRate: 48_000,
-      clientChannelCount: 1
+@Test func audioCaptureUsesAirPodsHardwareFormatForTapAndRecording() throws {
+  let hardwareFormat = AVAudioFormat(standardFormatWithSampleRate: 24_000, channels: 1)!
+  let staleClientFormat = AVAudioFormat(standardFormatWithSampleRate: 48_000, channels: 1)!
+
+  let plan = try #require(
+    AudioCaptureFormatPlan.make(
+      hardwareFormat: hardwareFormat,
+      clientFormat: staleClientFormat
     )
   )
-  #expect(
-    !AudioFormatReadiness.canInstallTap(
-      hardwareSampleRate: 0,
-      hardwareChannelCount: 1,
-      clientSampleRate: 48_000,
-      clientChannelCount: 1
-    )
-  )
+
+  #expect(plan.tapFormat.sampleRate == 24_000)
+  #expect(plan.recordingFormat.sampleRate == 24_000)
+  #expect(plan.tapFormat.channelCount == 1)
+  #expect(plan.recordingFormat.channelCount == 1)
 }

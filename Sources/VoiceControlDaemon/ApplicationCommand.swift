@@ -3,6 +3,7 @@ import Foundation
 enum ApplicationCommand: Equatable, Hashable {
   case focus(ApplicationTarget)
   case newChat
+  case closeTab
   case clearContext
   case compactContext
   case interruptSession

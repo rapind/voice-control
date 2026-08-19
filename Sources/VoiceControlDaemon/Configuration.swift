@@ -4,6 +4,7 @@ import TOMLDecoder
 struct CommandPhrases: Equatable {
   var focus: [String]
   var newChat: [String]
+  var closeTab: [String]
   var clearContext: [String]
   var compactContext: [String]
   var interruptSession: [String]
@@ -25,7 +26,8 @@ struct CommandPhrases: Equatable {
 
   static let ghosttyDefaults = CommandPhrases(
     focus: ["focus ghost tee"],
-    newChat: ["new chat"],
+    newChat: ["new tab"],
+    closeTab: ["close tab"],
     clearContext: ["clear context"],
     compactContext: ["compact context"],
     interruptSession: ["quit session"],
@@ -35,21 +37,22 @@ struct CommandPhrases: Equatable {
     scrollUp: ["scroll up"],
     scrollDown: ["scroll down"],
     scrollEnd: [],
-    focus1: ["focus one"],
-    focus2: ["focus two"],
-    focus3: ["focus three"],
-    focus4: ["focus four"],
-    focus5: ["focus five"],
-    focus6: ["focus six"],
-    focus7: ["focus seven"],
-    focus8: ["focus eight"],
-    focus9: ["focus nine"]
+    focus1: ["focus one", "folk one"],
+    focus2: ["focus two", "folk two"],
+    focus3: ["focus three", "folk three"],
+    focus4: ["focus four", "folk four"],
+    focus5: ["focus five", "folk five"],
+    focus6: ["focus six", "folk six"],
+    focus7: ["focus seven", "folk seven"],
+    focus8: ["focus eight", "folk eight"],
+    focus9: ["focus nine", "folk nine"]
   )
 
   static let chatGPTDefaults = CommandPhrases(
     focus: ["focus chat"],
-    newChat: ["new chat"],
-    clearContext: [],
+    newChat: ["new tab"],
+    closeTab: ["close tab"],
+    clearContext: ["clear context"],
     compactContext: [],
     interruptSession: [],
     startSession: [],
@@ -58,20 +61,21 @@ struct CommandPhrases: Equatable {
     scrollUp: ["scroll up"],
     scrollDown: ["scroll down"],
     scrollEnd: ["scroll end"],
-    focus1: ["focus one"],
-    focus2: ["focus two"],
-    focus3: ["focus three"],
-    focus4: ["focus four"],
-    focus5: ["focus five"],
-    focus6: ["focus six"],
-    focus7: ["focus seven"],
-    focus8: ["focus eight"],
-    focus9: ["focus nine"]
+    focus1: ["focus one", "folk one"],
+    focus2: ["focus two", "folk two"],
+    focus3: ["focus three", "folk three"],
+    focus4: ["focus four", "folk four"],
+    focus5: ["focus five", "folk five"],
+    focus6: ["focus six", "folk six"],
+    focus7: ["focus seven", "folk seven"],
+    focus8: ["focus eight", "folk eight"],
+    focus9: ["focus nine", "folk nine"]
   )
 
   static let chromeDefaults = CommandPhrases(
     focus: ["focus chrome"],
     newChat: [],
+    closeTab: [],
     clearContext: [],
     compactContext: [],
     interruptSession: [],
@@ -81,20 +85,21 @@ struct CommandPhrases: Equatable {
     scrollUp: ["scroll up"],
     scrollDown: ["scroll down"],
     scrollEnd: [],
-    focus1: ["focus one"],
-    focus2: ["focus two"],
-    focus3: ["focus three"],
-    focus4: ["focus four"],
-    focus5: ["focus five"],
-    focus6: ["focus six"],
-    focus7: ["focus seven"],
-    focus8: ["focus eight"],
-    focus9: ["focus nine"]
+    focus1: ["focus one", "folk one"],
+    focus2: ["focus two", "folk two"],
+    focus3: ["focus three", "folk three"],
+    focus4: ["focus four", "folk four"],
+    focus5: ["focus five", "folk five"],
+    focus6: ["focus six", "folk six"],
+    focus7: ["focus seven", "folk seven"],
+    focus8: ["focus eight", "folk eight"],
+    focus9: ["focus nine", "folk nine"]
   )
 
   var nonFocusMappings: [(ApplicationCommand, [String])] {
     [
       (.newChat, newChat),
+      (.closeTab, closeTab),
       (.clearContext, clearContext),
       (.compactContext, compactContext),
       (.interruptSession, interruptSession),
@@ -166,7 +171,8 @@ struct Configuration: Equatable {
 
     [applications.ghostty.commands]
     focus = ["focus ghost tee"]
-    new_chat = ["new chat"]
+    new_chat = ["new tab"]
+    close_tab = ["close tab"]
     clear_context = ["clear context"]
     compact_context = ["compact context"]
     interrupt_session = ["quit session"]
@@ -175,45 +181,47 @@ struct Configuration: Equatable {
     stop_sharing = ["stop sharing"]
     scroll_up = ["scroll up"]
     scroll_down = ["scroll down"]
-    focus_1 = ["focus one"]
-    focus_2 = ["focus two"]
-    focus_3 = ["focus three"]
-    focus_4 = ["focus four"]
-    focus_5 = ["focus five"]
-    focus_6 = ["focus six"]
-    focus_7 = ["focus seven"]
-    focus_8 = ["focus eight"]
-    focus_9 = ["focus nine"]
+    focus_1 = ["focus one", "folk one"]
+    focus_2 = ["focus two", "folk two"]
+    focus_3 = ["focus three", "folk three"]
+    focus_4 = ["focus four", "folk four"]
+    focus_5 = ["focus five", "folk five"]
+    focus_6 = ["focus six", "folk six"]
+    focus_7 = ["focus seven", "folk seven"]
+    focus_8 = ["focus eight", "folk eight"]
+    focus_9 = ["focus nine", "folk nine"]
 
     [applications.chatgpt.commands]
     focus = ["focus chat"]
-    new_chat = ["new chat"]
+    new_chat = ["new tab"]
+    close_tab = ["close tab"]
+    clear_context = ["clear context"]
     scroll_up = ["scroll up"]
     scroll_down = ["scroll down"]
     scroll_end = ["scroll end"]
-    focus_1 = ["focus one"]
-    focus_2 = ["focus two"]
-    focus_3 = ["focus three"]
-    focus_4 = ["focus four"]
-    focus_5 = ["focus five"]
-    focus_6 = ["focus six"]
-    focus_7 = ["focus seven"]
-    focus_8 = ["focus eight"]
-    focus_9 = ["focus nine"]
+    focus_1 = ["focus one", "folk one"]
+    focus_2 = ["focus two", "folk two"]
+    focus_3 = ["focus three", "folk three"]
+    focus_4 = ["focus four", "folk four"]
+    focus_5 = ["focus five", "folk five"]
+    focus_6 = ["focus six", "folk six"]
+    focus_7 = ["focus seven", "folk seven"]
+    focus_8 = ["focus eight", "folk eight"]
+    focus_9 = ["focus nine", "folk nine"]
 
     [applications.chrome.commands]
     focus = ["focus chrome"]
     scroll_up = ["scroll up"]
     scroll_down = ["scroll down"]
-    focus_1 = ["focus one"]
-    focus_2 = ["focus two"]
-    focus_3 = ["focus three"]
-    focus_4 = ["focus four"]
-    focus_5 = ["focus five"]
-    focus_6 = ["focus six"]
-    focus_7 = ["focus seven"]
-    focus_8 = ["focus eight"]
-    focus_9 = ["focus nine"]
+    focus_1 = ["focus one", "folk one"]
+    focus_2 = ["focus two", "folk two"]
+    focus_3 = ["focus three", "folk three"]
+    focus_4 = ["focus four", "folk four"]
+    focus_5 = ["focus five", "folk five"]
+    focus_6 = ["focus six", "folk six"]
+    focus_7 = ["focus seven", "folk seven"]
+    focus_8 = ["focus eight", "folk eight"]
+    focus_9 = ["focus nine", "folk nine"]
     """
 
   static var defaultFileURL: URL {
@@ -277,6 +285,7 @@ struct Configuration: Equatable {
     CommandPhrases(
       focus: raw?.focus ?? defaults.focus,
       newChat: raw?.newChat ?? defaults.newChat,
+      closeTab: raw?.closeTab ?? defaults.closeTab,
       clearContext: raw?.clearContext ?? defaults.clearContext,
       compactContext: raw?.compactContext ?? defaults.compactContext,
       interruptSession: raw?.interruptSession ?? defaults.interruptSession,
@@ -345,6 +354,7 @@ struct Configuration: Equatable {
       var commands = applicationCommands[target]!
       commands.focus = Self.normalizedPhrases(commands.focus)
       commands.newChat = Self.normalizedPhrases(commands.newChat)
+      commands.closeTab = Self.normalizedPhrases(commands.closeTab)
       commands.clearContext = Self.normalizedPhrases(commands.clearContext)
       commands.compactContext = Self.normalizedPhrases(commands.compactContext)
       commands.interruptSession = Self.normalizedPhrases(commands.interruptSession)
@@ -368,7 +378,7 @@ struct Configuration: Equatable {
     for target in [ApplicationTarget.chatGPT, .chrome] {
       let commands = applicationCommands[target]!
       guard
-        commands.clearContext.isEmpty,
+        target == .chatGPT || commands.clearContext.isEmpty,
         commands.compactContext.isEmpty,
         commands.interruptSession.isEmpty,
         commands.startSession.isEmpty,
@@ -379,6 +389,9 @@ struct Configuration: Equatable {
           "\(target.displayName) does not support context or session commands"
         )
       }
+    }
+    guard applicationCommands[.chrome]!.closeTab.isEmpty else {
+      throw ConfigurationError("Chrome does not support close tab")
     }
     for target in [ApplicationTarget.ghostty, .chrome] {
       guard applicationCommands[target]!.scrollEnd.isEmpty else {
@@ -490,6 +503,7 @@ private struct RawApplication: Decodable {
 private struct RawCommandPhrases: Decodable {
   var focus: [String]?
   var newChat: [String]?
+  var closeTab: [String]?
   var clearContext: [String]?
   var compactContext: [String]?
   var interruptSession: [String]?
@@ -512,6 +526,7 @@ private struct RawCommandPhrases: Decodable {
   enum CodingKeys: String, CodingKey {
     case focus
     case newChat = "new_chat"
+    case closeTab = "close_tab"
     case clearContext = "clear_context"
     case compactContext = "compact_context"
     case interruptSession = "interrupt_session"

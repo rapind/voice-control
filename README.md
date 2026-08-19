@@ -58,48 +58,51 @@ maximum_recording_seconds = 90
 
 [applications.ghostty.commands]
 focus = ["focus ghost tee"]
-new_chat = ["new chat"]
+new_chat = ["new tab"]
+close_tab = ["close tab"]
 clear_context = ["clear context"]
 compact_context = ["compact context"]
 interrupt_session = ["quit session"]
 start_session = ["start session"]
 share_session = ["share session"]
 stop_sharing = ["stop sharing"]
-focus_1 = ["focus one"]
-focus_2 = ["focus two"]
-focus_3 = ["focus three"]
-focus_4 = ["focus four"]
-focus_5 = ["focus five"]
-focus_6 = ["focus six"]
-focus_7 = ["focus seven"]
-focus_8 = ["focus eight"]
-focus_9 = ["focus nine"]
+focus_1 = ["focus one", "folk one"]
+focus_2 = ["focus two", "folk two"]
+focus_3 = ["focus three", "folk three"]
+focus_4 = ["focus four", "folk four"]
+focus_5 = ["focus five", "folk five"]
+focus_6 = ["focus six", "folk six"]
+focus_7 = ["focus seven", "folk seven"]
+focus_8 = ["focus eight", "folk eight"]
+focus_9 = ["focus nine", "folk nine"]
 
 [applications.chatgpt.commands]
 focus = ["focus chat"]
-new_chat = ["new chat"]
+new_chat = ["new tab"]
+close_tab = ["close tab"]
+clear_context = ["clear context"]
 scroll_end = ["scroll end"]
-focus_1 = ["focus one"]
-focus_2 = ["focus two"]
-focus_3 = ["focus three"]
-focus_4 = ["focus four"]
-focus_5 = ["focus five"]
-focus_6 = ["focus six"]
-focus_7 = ["focus seven"]
-focus_8 = ["focus eight"]
-focus_9 = ["focus nine"]
+focus_1 = ["focus one", "folk one"]
+focus_2 = ["focus two", "folk two"]
+focus_3 = ["focus three", "folk three"]
+focus_4 = ["focus four", "folk four"]
+focus_5 = ["focus five", "folk five"]
+focus_6 = ["focus six", "folk six"]
+focus_7 = ["focus seven", "folk seven"]
+focus_8 = ["focus eight", "folk eight"]
+focus_9 = ["focus nine", "folk nine"]
 
 [applications.chrome.commands]
 focus = ["focus chrome"]
-focus_1 = ["focus one"]
-focus_2 = ["focus two"]
-focus_3 = ["focus three"]
-focus_4 = ["focus four"]
-focus_5 = ["focus five"]
-focus_6 = ["focus six"]
-focus_7 = ["focus seven"]
-focus_8 = ["focus eight"]
-focus_9 = ["focus nine"]
+focus_1 = ["focus one", "folk one"]
+focus_2 = ["focus two", "folk two"]
+focus_3 = ["focus three", "folk three"]
+focus_4 = ["focus four", "folk four"]
+focus_5 = ["focus five", "folk five"]
+focus_6 = ["focus six", "folk six"]
+focus_7 = ["focus seven", "folk seven"]
+focus_8 = ["focus eight", "folk eight"]
+focus_9 = ["focus nine", "folk nine"]
 ```
 
 Save the file and the app applies valid changes within about one second. You do not need to rebuild or restart it. Invalid TOML leaves the last working configuration active and shows a config error in the menu. Older `target` settings are accepted but no longer control routing.
@@ -108,7 +111,7 @@ Save the file and the app applies valid changes within about one second. You do 
 
 The wake phrase starts recording without changing focus. Dictation is bound to whichever window was frontmost when recording started. Application-focus phrases, `focus ghost tee`, `focus chat`, and `focus chrome`, execute after a wake phrase.
 
-Focus one through eight and the scroll commands execute directly from idle. In Ghostty, focus commands send Control+Option+1 through Control+Option+8, and in ChatGPT or Chrome they send Command+1 through Command+8. `scroll up` and `scroll down` send mouse wheel events to the frontmost window. If another application was frontmost, the phrase is consumed without sending a keyboard shortcut.
+`focus one` or `folk one` through eight and the scroll commands execute directly from idle. In Ghostty, numbered focus commands send Control+Option+1 through Control+Option+8, and in ChatGPT or Chrome they send Command+1 through Command+8. `scroll up` and `scroll down` send mouse wheel events to the frontmost window. If another application was frontmost, the phrase is consumed without sending a keyboard shortcut.
 
 Use another configuration file when launching if needed:
 
@@ -122,17 +125,17 @@ The menu-bar item shows the current state and active control phrases. Use **Open
 
 ## Application commands
 
-The wake phrase starts recording. Once recording, command aliases execute immediately from Apple Speech partials and do not require a submit phrase. `focus one` through `focus eight`, `scroll up`, and `scroll down` are the exception: they execute directly from idle without the wake phrase.
+The wake phrase starts recording. Once recording, command aliases execute immediately from Apple Speech partials and do not require a submit phrase. `focus one` or `folk one` through eight, `scroll up`, and `scroll down` are the exception: they execute directly from idle without the wake phrase.
 
 Ghostty, ChatGPT, and Chrome support:
 
-- `focus one` through `focus nine` after a wake phrase
+- `focus one` or `folk one` through nine after a wake phrase
 - `scroll up` and `scroll down` after a wake phrase
 - Their global application focus phrase
 
 ChatGPT also supports `scroll end`, which jumps toward the latest generated output.
 
-For Ghostty, `new chat` opens a new tab, types `codex`, and presses Return. `clear context` sends `/clear`, and `compact context` sends `/compact`; both press Return. `quit session` sends Control-D to the foreground terminal process. `start session` types `omp` and presses Return. `share session` sends `/collab` and `stop sharing` sends `/collab stop`, each followed by Return. Numbered focus commands send Control+Option+1 through Control+Option+9, matching the recommended Herdr workspace bindings. For ChatGPT, `new chat` sends Command-N. Chrome does not define a `new chat` command. Numbered focus commands in ChatGPT and Chrome send Command-1 through Command-9.
+For Ghostty, `new tab` creates and focuses a Herdr workspace through Herdr's API, while `close tab` closes the focused Herdr workspace. `clear context` sends `/clear`, and `compact context` sends `/compact`; both press Return. `quit session` sends Control-D to the foreground terminal process. `start session` types `omp` and presses Return. `share session` sends `/collab` and `stop sharing` sends `/collab stop`, each followed by Return. Numbered focus commands send Control+Option+1 through Control+Option+9, matching the configured Herdr workspace bindings. For ChatGPT, `new tab` sends Command-N, `close tab` sends Command-W, and `clear context` submits `/clear`. Chrome does not define new or close tab commands. Numbered focus commands in ChatGPT and Chrome send Command-1 through Command-9.
 
 `scroll up` and `scroll down` send mouse scroll wheel events to the center of the frontmost window, so they scroll whatever is on screen without moving the cursor or changing focus.
 

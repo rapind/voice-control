@@ -143,18 +143,13 @@ final class ApplicationController {
         .failure(InjectionError("\(target.displayName) is no longer the frontmost application")))
       return
     }
-    if command == .newChat, target == .ghostty {
-      guard postKey(keyCode: 17, flags: .maskCommand) else {
-        completion(.failure(InjectionError("Could not create a new Ghostty tab")))
-        return
+    if target == .ghostty, command == .newChat || command == .closeTab {
+      do {
+        try executeHerdrWorkspaceCommand(command)
+        completion(.success(()))
+      } catch {
+        completion(.failure(error))
       }
-      pasteAndSubmit(
-        "codex",
-        command: command,
-        to: target,
-        delay: 0.6,
-        completion: completion
-      )
       return
     }
     if command == .interruptSession {
@@ -304,6 +299,8 @@ final class ApplicationController {
       case .chatGPT: return (45, .maskCommand)
       case .chrome: return nil
       }
+    case .closeTab:
+      return target == .chatGPT ? (13, .maskCommand) : nil
     case .clearContext, .compactContext:
       return nil
     case .interruptSession, .startSession, .shareSession, .stopSharing:
@@ -392,12 +389,12 @@ final class ApplicationController {
   func slashCommandText(
     for command: ApplicationCommand, target: ApplicationTarget
   ) -> String? {
-    guard target == .ghostty else { return nil }
     switch command {
-    case .clearContext: return "/clear"
-    case .compactContext: return "/compact"
-    case .shareSession: return "/collab"
-    case .stopSharing: return "/collab stop"
+    case .clearContext:
+      return target == .ghostty || target == .chatGPT ? "/clear" : nil
+    case .compactContext: return target == .ghostty ? "/compact" : nil
+    case .shareSession: return target == .ghostty ? "/collab" : nil
+    case .stopSharing: return target == .ghostty ? "/collab stop" : nil
     default: return nil
     }
   }
@@ -527,6 +524,58 @@ final class ApplicationController {
     }
   }
 
+  private func executeHerdrWorkspaceCommand(_ command: ApplicationCommand) throws {
+    switch command {
+    case .newChat:
+      _ = try runHerdr(arguments: HerdrWorkspaceControl.createArguments)
+    case .closeTab:
+      let list = try runHerdr(arguments: ["workspace", "list"])
+      guard let workspaceID = try HerdrWorkspaceControl.focusedWorkspaceID(from: list) else {
+        throw InjectionError("Herdr has no focused workspace to close")
+      }
+      _ = try runHerdr(
+        arguments: HerdrWorkspaceControl.closeArguments(workspaceID: workspaceID)
+      )
+    default:
+      throw InjectionError("Unsupported Herdr workspace command")
+    }
+  }
+
+  private func runHerdr(arguments: [String]) throws -> Data {
+    let candidates = [
+      "/opt/homebrew/bin/herdr",
+      "/usr/local/bin/herdr",
+    ]
+    guard
+      let executable = candidates.first(where: {
+        FileManager.default.isExecutableFile(atPath: $0)
+      })
+    else {
+      throw InjectionError("Could not find the Herdr executable")
+    }
+
+    let process = Process()
+    let output = Pipe()
+    let errors = Pipe()
+    process.executableURL = URL(fileURLWithPath: executable)
+    process.arguments = arguments
+    process.standardOutput = output
+    process.standardError = errors
+    try process.run()
+    process.waitUntilExit()
+
+    let outputData = output.fileHandleForReading.readDataToEndOfFile()
+    guard process.terminationStatus == 0 else {
+      let errorData = errors.fileHandleForReading.readDataToEndOfFile()
+      let errorMessage = String(data: errorData, encoding: .utf8)?
+        .trimmingCharacters(in: .whitespacesAndNewlines)
+      throw InjectionError(
+        errorMessage.flatMap { $0.isEmpty ? nil : $0 } ?? "Herdr workspace command failed"
+      )
+    }
+    return outputData
+  }
+
   private func copyPasteboardItems(_ items: [NSPasteboardItem]) -> [NSPasteboardItem] {
     items.map { source in
       let copy = NSPasteboardItem()
@@ -543,6 +592,37 @@ final class ApplicationController {
     pasteboard.clearContents()
     if !items.isEmpty {
       pasteboard.writeObjects(items)
+    }
+  }
+}
+
+enum HerdrWorkspaceControl {
+  static let createArguments = ["workspace", "create", "--focus"]
+
+  static func closeArguments(workspaceID: String) -> [String] {
+    ["workspace", "close", workspaceID]
+  }
+
+  static func focusedWorkspaceID(from data: Data) throws -> String? {
+    let response = try JSONDecoder().decode(WorkspaceListResponse.self, from: data)
+    return response.result.workspaces.first(where: \.focused)?.workspaceID
+  }
+
+  private struct WorkspaceListResponse: Decodable {
+    let result: Result
+
+    struct Result: Decodable {
+      let workspaces: [Workspace]
+    }
+
+    struct Workspace: Decodable {
+      let focused: Bool
+      let workspaceID: String
+
+      enum CodingKeys: String, CodingKey {
+        case focused
+        case workspaceID = "workspace_id"
+      }
     }
   }
 }

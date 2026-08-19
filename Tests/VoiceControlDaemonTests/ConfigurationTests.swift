@@ -63,6 +63,53 @@ import Testing
   )
 }
 
+@Test func defaultsUseFocusAndFolkPhrasesAndChatGPTTabCommands() throws {
+  let configuration = try Configuration.decodeTOML(Data())
+
+  for target in ApplicationTarget.allCases {
+    let mappings = configuration.commandMappings(for: target)
+    #expect(
+      ApplicationCommand.parse(
+        "focus one", wakePhrases: configuration.wakePhrases, mappings: mappings)
+        == .focusItem(1)
+    )
+    #expect(
+      ApplicationCommand.parse(
+        "folk one", wakePhrases: configuration.wakePhrases, mappings: mappings)
+        == .focusItem(1)
+    )
+    #expect(
+      ApplicationCommand.parse(
+        "tab one", wakePhrases: configuration.wakePhrases, mappings: mappings) == nil
+    )
+  }
+
+  let chatGPTMappings = configuration.commandMappings(for: .chatGPT)
+  #expect(
+    ApplicationCommand.parse(
+      "new tab", wakePhrases: configuration.wakePhrases, mappings: chatGPTMappings) == .newChat
+  )
+  #expect(
+    ApplicationCommand.parse(
+      "close tab", wakePhrases: configuration.wakePhrases, mappings: chatGPTMappings) == .closeTab
+  )
+  #expect(
+    ApplicationCommand.parse(
+      "clear context", wakePhrases: configuration.wakePhrases, mappings: chatGPTMappings)
+      == .clearContext
+  )
+
+  let ghosttyMappings = configuration.commandMappings(for: .ghostty)
+  #expect(
+    ApplicationCommand.parse(
+      "new tab", wakePhrases: configuration.wakePhrases, mappings: ghosttyMappings) == .newChat
+  )
+  #expect(
+    ApplicationCommand.parse(
+      "close tab", wakePhrases: configuration.wakePhrases, mappings: ghosttyMappings) == .closeTab
+  )
+}
+
 @Test func commandsFollowFrontmostTargetInsteadOfConfiguredTarget() throws {
   let configuration = try Configuration.decodeTOML(
     Data(
@@ -188,14 +235,14 @@ import Testing
   )
   #expect(
     ApplicationCommand.parse(
-      "focus one",
+      "folk one",
       wakePhrases: configuration.wakePhrases,
       mappings: configuration.commandMappings(for: .chrome)
     ) == .focusItem(1)
   )
   #expect(
     ApplicationCommand.parse(
-      "focus 1",
+      "tab 1",
       wakePhrases: configuration.wakePhrases,
       mappings: configuration.commandMappings(for: .chrome)
     ) == nil
@@ -296,7 +343,7 @@ import Testing
   #expect(configuration.silenceThresholdDB == -38)
   #expect(configuration.maximumRecordingSeconds == 120)
   #expect(configuration.applicationCommands[.ghostty]?.newChat == ["make a chat"])
-  #expect(configuration.applicationCommands[.ghostty]?.focus1 == ["focus one"])
+  #expect(configuration.applicationCommands[.ghostty]?.focus1 == ["focus one", "folk one"])
 }
 
 @Test func rejectsPhraseCollisionAcrossActions() throws {

@@ -32,6 +32,37 @@ import Testing
   #expect(ScrollCommand.pixelsToEnd == 20_000)
 }
 
+@Test func chatGPTTabCommandsUseTheAppMenuShortcuts() throws {
+  let controller = ApplicationController()
+  let newTab = try #require(controller.keyStroke(for: .newChat, target: .chatGPT))
+  let closeTab = try #require(controller.keyStroke(for: .closeTab, target: .chatGPT))
+
+  #expect(newTab.keyCode == 45)
+  #expect(newTab.flags == .maskCommand)
+  #expect(closeTab.keyCode == 13)
+  #expect(closeTab.flags == .maskCommand)
+  #expect(controller.slashCommandText(for: .clearContext, target: .chatGPT) == "/clear")
+  #expect(controller.slashCommandText(for: .compactContext, target: .chatGPT) == nil)
+  #expect(controller.keyStroke(for: .closeTab, target: .ghostty) == nil)
+}
+
+@Test func herdrWorkspaceCommandsCreateAndCloseTheFocusedWorkspace() throws {
+  #expect(HerdrWorkspaceControl.createArguments == ["workspace", "create", "--focus"])
+
+  let response = Data(
+    """
+    {"result":{"type":"workspace_list","workspaces":[
+      {"focused":false,"workspace_id":"w0"},
+      {"focused":true,"workspace_id":"w11"}
+    ]}}
+    """.utf8
+  )
+
+  #expect(try HerdrWorkspaceControl.focusedWorkspaceID(from: response) == "w11")
+  #expect(
+    HerdrWorkspaceControl.closeArguments(workspaceID: "w11") == ["workspace", "close", "w11"])
+}
+
 @Test func ghosttyContextCommandsSubmitCodexSlashCommands() {
   let controller = ApplicationController()
 

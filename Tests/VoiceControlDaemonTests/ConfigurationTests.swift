@@ -568,27 +568,37 @@ import Testing
   )
 }
 
-@Test func calculatesRecordingCutoffFramesFromTranscriptTail() {
+@Test func calculatesRecordingFramesToKeepBeforeSubmitPhrase() {
   #expect(
-    RecordingCutoff.frameCount(
-      secondsToRemoveFromEnd: 1.25,
+    RecordingCutoff.frameCountToKeep(
+      duration: 1.25,
       sampleRate: 16_000,
       availableFrames: 40_000
     ) == 20_000
   )
   #expect(
-    RecordingCutoff.frameCount(
-      secondsToRemoveFromEnd: -1,
+    RecordingCutoff.frameCountToKeep(
+      duration: -1,
+      sampleRate: 16_000,
+      availableFrames: 40_000
+    ) == 0
+  )
+  #expect(
+    RecordingCutoff.frameCountToKeep(
+      duration: 10,
       sampleRate: 16_000,
       availableFrames: 40_000
     ) == 40_000
   )
+}
+
+@Test func recordingCutoffStopsBeforeSubmitPhraseDespiteRecognitionDelay() {
   #expect(
-    RecordingCutoff.frameCount(
-      secondsToRemoveFromEnd: 10,
-      sampleRate: 16_000,
-      availableFrames: 40_000
-    ) == 0
+    RecordingCutoff.durationToKeep(
+      recordingStartAudioTime: 10,
+      controlPhraseStartAudioTime: 15,
+      safetyMargin: 0.12
+    ) == 4.88
   )
 }
 
@@ -609,7 +619,7 @@ import Testing
 
   let trimmedURL = try RecordingTrimmer.trim(
     sourceURL,
-    secondsToRemoveFromEnd: 0.5
+    keepingFirst: 0.5
   )
 
   let trimmed = try AVAudioFile(forReading: trimmedURL)

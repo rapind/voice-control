@@ -16,6 +16,7 @@ final class AudioCapture {
   )
   private var recordingFile: AVAudioFile?
   private var recordingURL: URL?
+  private var recordingStartAudioTime: TimeInterval?
   private var totalCapturedTime: TimeInterval = 0
   private var tapInstalled = false
   private var tapFormat: AVAudioFormat?
@@ -177,22 +178,28 @@ final class AudioCapture {
     lock.lock()
     recordingURL = url
     recordingFile = file
+    recordingStartAudioTime = totalCapturedTime
     lock.unlock()
   }
 
   func finishRecording() -> URL? {
-    takeRecording()
+    takeRecording()?.url
   }
 
-  func finishRecording(removingTailOf duration: TimeInterval) throws -> URL? {
-    guard let recordingURL = takeRecording() else { return nil }
+  func finishRecording(endingAtAudioTime cutoffAudioTime: TimeInterval) throws -> URL? {
+    guard let recording = takeRecording() else { return nil }
+    let durationToKeep = RecordingCutoff.durationToKeep(
+      recordingStartAudioTime: recording.startAudioTime,
+      controlPhraseStartAudioTime: cutoffAudioTime,
+      safetyMargin: 0.12
+    )
     do {
       return try RecordingTrimmer.trim(
-        recordingURL,
-        secondsToRemoveFromEnd: duration
+        recording.url,
+        keepingFirst: durationToKeep
       )
     } catch {
-      try? FileManager.default.removeItem(at: recordingURL)
+      try? FileManager.default.removeItem(at: recording.url)
       throw error
     }
   }
@@ -201,6 +208,7 @@ final class AudioCapture {
     lock.lock()
     recordingFile = nil
     recordingURL = nil
+    recordingStartAudioTime = nil
     loggedFirstBuffer = false
     lock.unlock()
     if tapInstalled {
@@ -212,13 +220,16 @@ final class AudioCapture {
     engine.stop()
   }
 
-  private func takeRecording() -> URL? {
+  private func takeRecording() -> (url: URL, startAudioTime: TimeInterval)? {
     lock.lock()
     let url = recordingURL
+    let startAudioTime = recordingStartAudioTime
     recordingFile = nil
     recordingURL = nil
+    recordingStartAudioTime = nil
     lock.unlock()
-    return url
+    guard let url, let startAudioTime else { return nil }
+    return (url, startAudioTime)
   }
 
   private func matchesTapFormat(_ format: AVAudioFormat) -> Bool {
@@ -334,11 +345,11 @@ enum AudioCaptureBufferNormalizer {
 enum RecordingTrimmer {
   static func trim(
     _ url: URL,
-    secondsToRemoveFromEnd: TimeInterval
+    keepingFirst duration: TimeInterval
   ) throws -> URL {
     let source = try AVAudioFile(forReading: url)
-    let frameCount = RecordingCutoff.frameCount(
-      secondsToRemoveFromEnd: secondsToRemoveFromEnd,
+    let frameCount = RecordingCutoff.frameCountToKeep(
+      duration: duration,
       sampleRate: source.processingFormat.sampleRate,
       availableFrames: source.length
     )
@@ -379,16 +390,24 @@ enum RecordingTrimmer {
 }
 
 enum RecordingCutoff {
-  static func frameCount(
-    secondsToRemoveFromEnd: TimeInterval,
+  static func durationToKeep(
+    recordingStartAudioTime: TimeInterval,
+    controlPhraseStartAudioTime: TimeInterval,
+    safetyMargin: TimeInterval
+  ) -> TimeInterval {
+    max(0, controlPhraseStartAudioTime - recordingStartAudioTime - max(0, safetyMargin))
+  }
+
+  static func frameCountToKeep(
+    duration: TimeInterval,
     sampleRate: Double,
     availableFrames: AVAudioFramePosition
   ) -> AVAudioFramePosition {
     guard sampleRate > 0, availableFrames > 0 else { return 0 }
-    let removedFrames = AVAudioFramePosition(
-      (max(0, secondsToRemoveFromEnd) * sampleRate).rounded(.up)
+    let retainedFrames = AVAudioFramePosition(
+      (max(0, duration) * sampleRate).rounded(.down)
     )
-    return max(0, availableFrames - removedFrames)
+    return min(availableFrames, retainedFrames)
   }
 }
 

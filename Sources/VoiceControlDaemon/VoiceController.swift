@@ -24,7 +24,7 @@ final class VoiceController {
   private var sessionTarget: ApplicationTarget?
   private var lastSpeechAt = Date()
   private var recordingStartedAt = Date()
-  private var submitTailDuration: TimeInterval?
+  private var submitCutoffAudioTime: TimeInterval?
   private var ignoreSilenceUntil = Date()
   private var heardPromptSpeech = false
   private var silenceTimer: Timer?
@@ -171,7 +171,7 @@ final class VoiceController {
       recordingStartedAt = Date()
       ignoreSilenceUntil = Date().addingTimeInterval(0.6)
       lastSpeechAt = ignoreSilenceUntil
-      submitTailDuration = nil
+      submitCutoffAudioTime = nil
       heardPromptSpeech = false
       preview = TranscriptPreview()
       pendingPreviewText = ""
@@ -196,8 +196,8 @@ final class VoiceController {
       liveAudioRouter.finish()
       let fileURL: URL?
       do {
-        if let submitTailDuration {
-          fileURL = try audio.finishRecording(removingTailOf: submitTailDuration)
+        if let submitCutoffAudioTime {
+          fileURL = try audio.finishRecording(endingAtAudioTime: submitCutoffAudioTime)
         } else {
           fileURL = audio.finishRecording()
         }
@@ -205,7 +205,7 @@ final class VoiceController {
         fail("Could not trim the submit command from the recording: \(error.localizedDescription)")
         return
       }
-      self.submitTailDuration = nil
+      self.submitCutoffAudioTime = nil
       guard let fileURL else {
         fail("No prompt recording was available")
         return
@@ -309,7 +309,7 @@ final class VoiceController {
         in: transcript,
         maximumTrailingWords: 6
       ) {
-        submitTailDuration = max(0, match.transcriptEndTime - match.endTime)
+        submitCutoffAudioTime = match.startTime
         print("Submit phrase detected")
         dispatch(.submitDetected)
       } else if let command = ApplicationCommand.parse(

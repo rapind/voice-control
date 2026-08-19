@@ -2,20 +2,20 @@ import Testing
 
 @testable import VoiceControlDaemon
 
-@Test func audioTapWaitsForMatchingHardwareAndClientFormats() {
+@Test func audioTapAllowsCoreAudioSampleRateConversion() {
   #expect(
     AudioFormatReadiness.canInstallTap(
       hardwareSampleRate: 24_000,
       hardwareChannelCount: 1,
       clientSampleRate: 48_000,
       clientChannelCount: 1
-    ) == false
+    )
   )
   #expect(
-    AudioFormatReadiness.canInstallTap(
-      hardwareSampleRate: 24_000,
+    !AudioFormatReadiness.canInstallTap(
+      hardwareSampleRate: 0,
       hardwareChannelCount: 1,
-      clientSampleRate: 24_000,
+      clientSampleRate: 48_000,
       clientChannelCount: 1
     )
   )

@@ -71,7 +71,7 @@ final class AudioCapture {
         clientChannelCount: format.channelCount
       )
     else {
-      throw AudioCaptureError("The selected microphone format is still changing")
+      throw AudioCaptureError("The selected microphone has no usable input format")
     }
 
     // When the default input device changes (for example AirPods disconnect),
@@ -194,7 +194,7 @@ enum AudioFormatReadiness {
   ) -> Bool {
     hardwareSampleRate > 0
       && hardwareChannelCount > 0
-      && hardwareSampleRate == clientSampleRate
+      && clientSampleRate > 0
       && hardwareChannelCount == clientChannelCount
   }
 }

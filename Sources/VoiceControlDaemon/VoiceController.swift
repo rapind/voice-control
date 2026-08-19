@@ -478,7 +478,8 @@ final class VoiceController {
         WakeListenerHealth.shouldRecover(
           phase: self.machine.phase,
           audioIsRunning: self.audio.isRunning,
-          isReceivingAudio: self.audio.isReceivingAudio
+          isReceivingAudio: self.audio.isReceivingAudio,
+          restartIsScheduled: self.audioRestartWorkItem != nil
         )
       else {
         return
@@ -607,8 +608,9 @@ enum WakeListenerHealth {
   static func shouldRecover(
     phase: VoicePhase,
     audioIsRunning: Bool,
-    isReceivingAudio: Bool
+    isReceivingAudio: Bool,
+    restartIsScheduled: Bool
   ) -> Bool {
-    phase == .waitingForWake && (!audioIsRunning || !isReceivingAudio)
+    phase == .waitingForWake && !restartIsScheduled && (!audioIsRunning || !isReceivingAudio)
   }
 }

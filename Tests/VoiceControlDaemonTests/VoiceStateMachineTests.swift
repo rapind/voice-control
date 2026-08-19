@@ -29,14 +29,32 @@ import Testing
 @Test func wakeListenerRecoversOnlyWhenIdleAudioStalls() {
   #expect(
     WakeListenerHealth.shouldRecover(
-      phase: .waitingForWake, audioIsRunning: false, isReceivingAudio: true))
+      phase: .waitingForWake,
+      audioIsRunning: false,
+      isReceivingAudio: true,
+      restartIsScheduled: false))
   #expect(
     WakeListenerHealth.shouldRecover(
-      phase: .waitingForWake, audioIsRunning: true, isReceivingAudio: false))
+      phase: .waitingForWake,
+      audioIsRunning: true,
+      isReceivingAudio: false,
+      restartIsScheduled: false))
   #expect(
     !WakeListenerHealth.shouldRecover(
-      phase: .waitingForWake, audioIsRunning: true, isReceivingAudio: true))
+      phase: .waitingForWake,
+      audioIsRunning: true,
+      isReceivingAudio: true,
+      restartIsScheduled: false))
   #expect(
     !WakeListenerHealth.shouldRecover(
-      phase: .recording, audioIsRunning: false, isReceivingAudio: true))
+      phase: .recording,
+      audioIsRunning: false,
+      isReceivingAudio: true,
+      restartIsScheduled: false))
+  #expect(
+    !WakeListenerHealth.shouldRecover(
+      phase: .waitingForWake,
+      audioIsRunning: false,
+      isReceivingAudio: false,
+      restartIsScheduled: true))
 }

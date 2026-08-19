@@ -558,7 +558,7 @@ enum SubmissionTiming {
 }
 
 enum ScrollCommand {
-  static let pixelsToEnd: Int32 = 3_000
+  static let pixelsToEnd: Int32 = 20_000
 
   static func pixelsPerStep(for target: ApplicationTarget) -> Int32 {
     target == .chatGPT ? 670 : 160

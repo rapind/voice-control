@@ -5,7 +5,7 @@ import OSLog
 final class AudioCapture {
   var onBuffer: ((AVAudioPCMBuffer, TimeInterval) -> Void)?
   var onRecordingBuffer: ((AVAudioPCMBuffer) -> Void)?
-  var onLevel: ((Float) -> Void)?
+  var onLevel: ((AudioLevelSample) -> Void)?
   var onConfigurationChange: (() -> Void)?
 
   private let engine = AVAudioEngine()
@@ -153,7 +153,13 @@ final class AudioCapture {
         if file != nil {
           self.onRecordingBuffer?(deliveryBuffer)
         }
-        self.onLevel?(level)
+        self.onLevel?(
+          AudioLevelSample(
+            levelDB: level,
+            startTime: bufferStartTime,
+            duration: duration
+          )
+        )
       }
       tapFormat = formatPlan.tapFormat
       tapInstalled = true
@@ -243,6 +249,49 @@ final class AudioCapture {
     let samples = UnsafeBufferPointer(start: channels[0], count: Int(buffer.frameLength))
     let meanSquare = samples.reduce(Float.zero) { $0 + ($1 * $1) } / Float(samples.count)
     return 20 * log10(max(sqrt(meanSquare), 0.000_001))
+  }
+}
+
+struct AudioLevelSample: Equatable {
+  let levelDB: Float
+  let startTime: TimeInterval
+  let duration: TimeInterval
+}
+
+struct SpeechBurstTracker {
+  let separatingSilence: TimeInterval
+
+  private(set) var currentBurstStartAudioTime: TimeInterval?
+  private(set) var latestSeparatedBurstStartAudioTime: TimeInterval?
+  private var lastSpeechEndAudioTime: TimeInterval?
+
+  init(separatingSilence: TimeInterval) {
+    self.separatingSilence = separatingSilence
+  }
+
+  mutating func reset() {
+    currentBurstStartAudioTime = nil
+    latestSeparatedBurstStartAudioTime = nil
+    lastSpeechEndAudioTime = nil
+  }
+
+  mutating func observe(
+    _ sample: AudioLevelSample,
+    speechThresholdDB: Float
+  ) {
+    guard sample.levelDB >= speechThresholdDB else { return }
+
+    if let lastSpeechEndAudioTime {
+      let silence = sample.startTime - lastSpeechEndAudioTime
+      if silence >= separatingSilence {
+        currentBurstStartAudioTime = sample.startTime
+        latestSeparatedBurstStartAudioTime = sample.startTime
+      }
+    } else {
+      currentBurstStartAudioTime = sample.startTime
+    }
+
+    lastSpeechEndAudioTime = sample.startTime + sample.duration
   }
 }
 
@@ -353,6 +402,9 @@ enum RecordingTrimmer {
       sampleRate: source.processingFormat.sampleRate,
       availableFrames: source.length
     )
+    guard frameCount > 0 else {
+      throw AudioCaptureError("No prompt was recorded before the submit command")
+    }
     guard frameCount < source.length else { return url }
 
     let trimmedURL = url.deletingPathExtension()

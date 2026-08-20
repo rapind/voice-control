@@ -35,6 +35,7 @@ final class VoiceController {
   private var pendingPreviewText = ""
   private var previewReady = false
   private var ambientNoiseFloor = AmbientNoiseFloor()
+  private var speechBurstTracker = SpeechBurstTracker(separatingSilence: 0.6)
 
   init(configuration: Configuration) {
     self.configuration = configuration
@@ -49,9 +50,9 @@ final class VoiceController {
     audio.onRecordingBuffer = { buffer in
       liveAudioRouter.appendCopy(of: buffer)
     }
-    audio.onLevel = { [weak self] db in
+    audio.onLevel = { [weak self] sample in
       DispatchQueue.main.async {
-        self?.handleAudioLevel(db)
+        self?.handleAudioLevel(sample)
       }
     }
     audio.onConfigurationChange = { [weak self] in
@@ -172,6 +173,7 @@ final class VoiceController {
       ignoreSilenceUntil = Date().addingTimeInterval(0.6)
       lastSpeechAt = ignoreSilenceUntil
       submitCutoffAudioTime = nil
+      speechBurstTracker.reset()
       heardPromptSpeech = false
       preview = TranscriptPreview()
       pendingPreviewText = ""
@@ -194,6 +196,7 @@ final class VoiceController {
       keywords.stop()
       NSSound(named: "Pop")?.play()
       liveAudioRouter.finish()
+      let requiresTrimmedRecording = submitCutoffAudioTime != nil
       let fileURL: URL?
       do {
         if let submitCutoffAudioTime {
@@ -210,7 +213,7 @@ final class VoiceController {
         fail("No prompt recording was available")
         return
       }
-      transcribe(fileURL)
+      transcribe(fileURL, discardLiveTranscript: requiresTrimmedRecording)
 
     case .cancelPromptRecording:
       silenceTimer?.invalidate()
@@ -304,12 +307,12 @@ final class VoiceController {
       ) != nil {
         print("Cancel phrase detected")
         dispatch(.cancelDetected)
-      } else if let match = PhraseMatcher.trailingMatch(
+      } else if PhraseMatcher.trailingMatch(
         any: configuration.submitPhrases,
         in: transcript,
         maximumTrailingWords: 6
-      ) {
-        submitCutoffAudioTime = match.startTime
+      ) != nil {
+        submitCutoffAudioTime = speechBurstTracker.latestSeparatedBurstStartAudioTime
         print("Submit phrase detected")
         dispatch(.submitDetected)
       } else if let command = ApplicationCommand.parse(
@@ -361,11 +364,11 @@ final class VoiceController {
     applyPendingPreview()
   }
 
-  private func handleAudioLevel(_ levelDB: Float) {
+  private func handleAudioLevel(_ sample: AudioLevelSample) {
     switch machine.phase {
     case .waitingForWake:
       let wasCalibrated = ambientNoiseFloor.isCalibrated
-      ambientNoiseFloor.observe(levelDB)
+      ambientNoiseFloor.observe(sample.levelDB)
       if !wasCalibrated, ambientNoiseFloor.isCalibrated,
         let estimateDB = ambientNoiseFloor.estimateDB
       {
@@ -381,7 +384,8 @@ final class VoiceController {
       let thresholdDB = ambientNoiseFloor.speechThreshold(
         fallback: configuration.silenceThresholdDB
       )
-      guard levelDB >= thresholdDB else { return }
+      speechBurstTracker.observe(sample, speechThresholdDB: thresholdDB)
+      guard sample.levelDB >= thresholdDB else { return }
       heardPromptSpeech = true
       lastSpeechAt = Date()
     default:
@@ -452,11 +456,14 @@ final class VoiceController {
     silenceTimer = timer
   }
 
-  private func transcribe(_ fileURL: URL) {
+  private func transcribe(_ fileURL: URL, discardLiveTranscript: Bool = false) {
     Task { @MainActor in
       defer { try? FileManager.default.removeItem(at: fileURL) }
       do {
-        let transcript = try await transcriber.transcribe(fileURL: fileURL)
+        let transcript = try await transcriber.transcribe(
+          fileURL: fileURL,
+          discardLiveTranscript: discardLiveTranscript
+        )
         let cleaned = PhraseMatcher.cleanFinalTranscript(
           transcript,
           wakePhrases: configuration.wakePhrases,

@@ -99,3 +99,45 @@ import Testing
 
   #expect(noiseFloor.speechThreshold(fallback: -45) == -45)
 }
+
+@Test func tracksSubmitSpeechBurstOnTheRecordingAudioTimeline() {
+  var tracker = SpeechBurstTracker(separatingSilence: 0.6)
+
+  tracker.observe(
+    AudioLevelSample(levelDB: -20, startTime: 100, duration: 0.4),
+    speechThresholdDB: -45
+  )
+  tracker.observe(
+    AudioLevelSample(levelDB: -70, startTime: 100.4, duration: 1.0),
+    speechThresholdDB: -45
+  )
+  tracker.observe(
+    AudioLevelSample(levelDB: -18, startTime: 101.4, duration: 0.3),
+    speechThresholdDB: -45
+  )
+  tracker.observe(
+    AudioLevelSample(levelDB: -65, startTime: 101.7, duration: 0.2),
+    speechThresholdDB: -45
+  )
+  tracker.observe(
+    AudioLevelSample(levelDB: -19, startTime: 101.9, duration: 0.2),
+    speechThresholdDB: -45
+  )
+  tracker.observe(
+    AudioLevelSample(levelDB: -70, startTime: 102.1, duration: 2.0),
+    speechThresholdDB: -45
+  )
+
+  #expect(tracker.latestSeparatedBurstStartAudioTime == 101.4)
+}
+
+@Test func doesNotCutAtTheStartOfAContinuousPrompt() {
+  var tracker = SpeechBurstTracker(separatingSilence: 0.6)
+
+  tracker.observe(
+    AudioLevelSample(levelDB: -20, startTime: 100, duration: 2),
+    speechThresholdDB: -45
+  )
+
+  #expect(tracker.latestSeparatedBurstStartAudioTime == nil)
+}

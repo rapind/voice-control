@@ -33,6 +33,11 @@ final class PromptTranscriber {
     }
   }
 
+  init(backend: any PromptTranscriberBackend) {
+    self.backend = backend
+    self.name = backend.name
+  }
+
   func prepare() async throws {
     try await backend.prepare()
   }
@@ -57,8 +62,14 @@ final class PromptTranscriber {
     await backend.stopLiveTranscription()
   }
 
-  func transcribe(fileURL: URL) async throws -> String {
-    try await backend.transcribe(fileURL: fileURL)
+  func transcribe(
+    fileURL: URL,
+    discardLiveTranscript: Bool = false
+  ) async throws -> String {
+    if discardLiveTranscript {
+      await backend.stopLiveTranscription()
+    }
+    return try await backend.transcribe(fileURL: fileURL)
   }
 }
 

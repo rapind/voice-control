@@ -626,6 +626,25 @@ import Testing
   #expect(trimmed.length == 24_000)
 }
 
+@Test func refusesToCreateAnEmptyTrimmedRecording() throws {
+  let directory = FileManager.default.temporaryDirectory
+    .appendingPathComponent(UUID().uuidString, isDirectory: true)
+  try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+  defer { try? FileManager.default.removeItem(at: directory) }
+  let sourceURL = directory.appendingPathComponent("prompt.wav")
+  let format = AVAudioFormat(standardFormatWithSampleRate: 48_000, channels: 1)!
+  let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: 4_800)!
+  buffer.frameLength = 4_800
+  do {
+    let file = try AVAudioFile(forWriting: sourceURL, settings: format.settings)
+    try file.write(from: buffer)
+  }
+
+  #expect(throws: AudioCaptureError.self) {
+    try RecordingTrimmer.trim(sourceURL, keepingFirst: 0)
+  }
+}
+
 @Test func reconcilesRevisedPartialTranscriptFromCommonPrefix() {
   var preview = TranscriptPreview()
 

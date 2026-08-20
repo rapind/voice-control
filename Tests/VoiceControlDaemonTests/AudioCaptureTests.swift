@@ -149,6 +149,7 @@ import Testing
   )
 
   #expect(tracker.latestSeparatedBurstStartAudioTime == 101.4)
+  #expect(tracker.latestCompletedBurstEndAudioTime == 100.4)
 }
 
 @Test func doesNotCutAtTheStartOfAContinuousPrompt() {
@@ -160,4 +161,5 @@ import Testing
   )
 
   #expect(tracker.latestSeparatedBurstStartAudioTime == nil)
+  #expect(tracker.latestSpeechEndAudioTime == 102)
 }

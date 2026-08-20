@@ -52,7 +52,7 @@ submit = ["send it", "sent it"]
 cancel = ["cancel it"]
 vocabulary = ["bean"]
 
-silence_seconds = 4
+silence_seconds = 5
 silence_threshold_db = -45
 maximum_recording_seconds = 90
 voice_processing = false

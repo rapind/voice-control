@@ -1,11 +1,17 @@
 @preconcurrency import AVFoundation
+import CoreMedia
 import Foundation
+import OSLog
 import Speech
 
 @available(macOS 26.0, *)
 actor AppleSpeechTranscriber: PromptTranscriberBackend {
   nonisolated let name = "Apple Speech progressive transcription"
   nonisolated let liveTranscriptIsAuthoritative = true
+  private let logger = Logger(
+    subsystem: "com.daverapin.voice-control-prototype",
+    category: "AppleSpeechTranscriber"
+  )
 
   private var locale: Locale?
   private var analyzer: SpeechAnalyzer?
@@ -16,6 +22,12 @@ actor AppleSpeechTranscriber: PromptTranscriberBackend {
   private var resultTask: Task<Void, Never>?
   private var finalizedText = ""
   private var volatileText = ""
+  private var finalizedResults: [TimedTranscript] = []
+  private var volatileResult: TimedTranscript?
+  private var latestResultAudioEnd: TimeInterval?
+  private var progressiveResultWaiter: CheckedContinuation<Bool, Never>?
+  private var progressiveResultTarget: TimeInterval?
+  private var progressiveResultTimeoutTask: Task<Void, Never>?
   private var liveError: (any Error)?
   private var generation = 0
 
@@ -58,8 +70,14 @@ actor AppleSpeechTranscriber: PromptTranscriberBackend {
     let generation = self.generation
     finalizedText = ""
     volatileText = ""
+    finalizedResults = []
+    volatileResult = nil
+    latestResultAudioEnd = nil
     liveError = nil
-    let transcriber = SpeechTranscriber(locale: locale, preset: .progressiveTranscription)
+    let transcriber = SpeechTranscriber(
+      locale: locale,
+      preset: .timeIndexedProgressiveTranscription
+    )
     let analyzer = SpeechAnalyzer(modules: [transcriber])
     let context = AnalysisContext()
     context.contextualStrings[.general] = contextualStrings
@@ -86,12 +104,21 @@ actor AppleSpeechTranscriber: PromptTranscriberBackend {
           try Task.checkCancellation()
           guard generation == self.generation else { return }
           let text = String(result.text.characters)
+          let timedTranscript = TimedTranscript(text: result.text, range: result.range)
           if result.isFinal {
             finalizedText += text
             volatileText = ""
+            finalizedResults.append(timedTranscript)
+            volatileResult = nil
           } else {
             volatileText = text
+            volatileResult = timedTranscript
           }
+          let resultEnd = result.range.end.seconds
+          if resultEnd.isFinite {
+            latestResultAudioEnd = max(latestResultAudioEnd ?? 0, resultEnd)
+          }
+          resumeProgressiveResultWaiterIfCovered()
           await onUpdate(finalizedText + volatileText)
         }
       } catch is CancellationError {
@@ -109,12 +136,21 @@ actor AppleSpeechTranscriber: PromptTranscriberBackend {
           inputFormat: nil,
           outputFormat: analyzerFormat
         )
+        var convertedFramePosition: Int64 = 0
+        let timeScale = CMTimeScale(analyzerFormat.sampleRate.rounded())
         for await buffer in input.stream {
           try Task.checkCancellation()
           guard generation == self.generation else { return }
-          inputBuilder?.yield(
-            AnalyzerInput(buffer: try converter.convert(buffer))
+          let converted = try converter.convert(buffer)
+          guard converted.frameLength > 0 else { continue }
+          let bufferStartTime = CMTime(
+            value: convertedFramePosition,
+            timescale: timeScale
           )
+          inputBuilder?.yield(
+            AnalyzerInput(buffer: converted, bufferStartTime: bufferStartTime)
+          )
+          convertedFramePosition += Int64(converted.frameLength)
         }
       } catch is CancellationError {
         return
@@ -147,6 +183,32 @@ actor AppleSpeechTranscriber: PromptTranscriberBackend {
     resultTask?.cancel()
     await resultTask?.value
     clearSession()
+  }
+
+  func finishLiveTranscription(
+    _ request: LiveTranscriptionFinishRequest
+  ) async throws -> String? {
+    liveInput?.finish()
+    await feederTask?.value
+    feederTask = nil
+    inputBuilder?.finish()
+    inputBuilder = nil
+
+    if let target = request.waitThroughAudioTime {
+      let covered = await waitForProgressiveResult(through: target)
+      logger.notice(
+        "Progressive drain target=\(target, privacy: .public)s result-end=\(self.latestResultAudioEnd ?? -1, privacy: .public)s covered=\(covered, privacy: .public)"
+      )
+    }
+
+    let text = progressiveText(before: request.includeAudioBeforeTime)
+    let error = liveError
+    await analyzer?.cancelAndFinishNow()
+    resultTask?.cancel()
+    await resultTask?.value
+    clearSession()
+    if let error { throw error }
+    return text
   }
 
   func transcribe(fileURL: URL) async throws -> String {
@@ -203,6 +265,11 @@ actor AppleSpeechTranscriber: PromptTranscriberBackend {
   }
 
   private func clearSession() {
+    progressiveResultTimeoutTask?.cancel()
+    progressiveResultTimeoutTask = nil
+    progressiveResultTarget = nil
+    progressiveResultWaiter?.resume(returning: false)
+    progressiveResultWaiter = nil
     analyzer = nil
     liveInput = nil
     inputBuilder = nil
@@ -210,8 +277,74 @@ actor AppleSpeechTranscriber: PromptTranscriberBackend {
     resultTask = nil
     finalizedText = ""
     volatileText = ""
+    finalizedResults = []
+    volatileResult = nil
+    latestResultAudioEnd = nil
     liveError = nil
   }
+
+  private func waitForProgressiveResult(through target: TimeInterval) async -> Bool {
+    guard !progressiveResultCovers(target) else { return true }
+    return await withCheckedContinuation { continuation in
+      progressiveResultTarget = target
+      progressiveResultWaiter = continuation
+      progressiveResultTimeoutTask?.cancel()
+      progressiveResultTimeoutTask = Task { [weak self] in
+        try? await Task.sleep(for: .milliseconds(900))
+        guard !Task.isCancelled else { return }
+        await self?.resumeProgressiveResultWaiter(covered: false)
+      }
+    }
+  }
+
+  private func progressiveResultCovers(_ target: TimeInterval) -> Bool {
+    guard let latestResultAudioEnd else { return false }
+    // Audio-level speech boundaries include the tail of the capture buffer.
+    // Speech's word range normally ends a little earlier than that boundary.
+    return latestResultAudioEnd + 0.25 >= target
+  }
+
+  private func resumeProgressiveResultWaiterIfCovered() {
+    guard
+      let progressiveResultTarget,
+      progressiveResultCovers(progressiveResultTarget)
+    else { return }
+    resumeProgressiveResultWaiter(covered: true)
+  }
+
+  private func resumeProgressiveResultWaiter(covered: Bool) {
+    progressiveResultTimeoutTask?.cancel()
+    progressiveResultTimeoutTask = nil
+    progressiveResultTarget = nil
+    let waiter = progressiveResultWaiter
+    progressiveResultWaiter = nil
+    waiter?.resume(returning: covered)
+  }
+
+  private func progressiveText(before cutoff: TimeInterval?) -> String {
+    let results = finalizedResults + [volatileResult].compactMap { $0 }
+    return results.map { result in
+      guard let cutoff else { return String(result.text.characters) }
+      let includedTime = CMTimeRange(
+        start: .zero,
+        duration: CMTime(seconds: cutoff, preferredTimescale: 48_000)
+      )
+      guard
+        let range = result.text.rangeOfAudioTimeRangeAttributes(
+          intersecting: includedTime
+        )
+      else {
+        return result.range.start.seconds < cutoff ? String(result.text.characters) : ""
+      }
+      return String(result.text[range].characters)
+    }.joined()
+  }
+}
+
+@available(macOS 26.0, *)
+private struct TimedTranscript: Sendable {
+  let text: AttributedString
+  let range: CMTimeRange
 }
 
 @available(macOS 26.0, *)

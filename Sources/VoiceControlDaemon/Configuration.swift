@@ -157,7 +157,7 @@ struct Configuration: Equatable {
     submitPhrases: ["ghost it"],
     cancelPhrases: ["ghost cancel"],
     vocabulary: [],
-    silenceSeconds: 4,
+    silenceSeconds: 5,
     silenceThresholdDB: -45,
     maximumRecordingSeconds: 90,
     voiceProcessingEnabled: false,
@@ -175,7 +175,7 @@ struct Configuration: Equatable {
     cancel = ["ghost cancel"]
     vocabulary = []
 
-    silence_seconds = 4
+    silence_seconds = 5
     silence_threshold_db = -45
     maximum_recording_seconds = 90
     voice_processing = false

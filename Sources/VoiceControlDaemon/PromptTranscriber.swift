@@ -13,12 +13,23 @@ protocol PromptTranscriberBackend: Sendable {
     onError: @escaping @MainActor @Sendable (String) -> Void
   ) async throws
   func stopLiveTranscription() async
+  func finishLiveTranscription(_ request: LiveTranscriptionFinishRequest) async throws -> String?
   func transcribe(fileURL: URL) async throws -> String
   func updateContextualStrings(_ contextualStrings: [String]) async
 }
 
 extension PromptTranscriberBackend {
   var liveTranscriptIsAuthoritative: Bool { false }
+
+  func finishLiveTranscription(_ request: LiveTranscriptionFinishRequest) async throws -> String? {
+    await stopLiveTranscription()
+    return nil
+  }
+}
+
+struct LiveTranscriptionFinishRequest: Equatable, Sendable {
+  let waitThroughAudioTime: TimeInterval?
+  let includeAudioBeforeTime: TimeInterval?
 }
 
 struct LiveTranscriptCheckpoint {
@@ -89,10 +100,25 @@ final class PromptTranscriber {
 
   func transcribe(
     fileURL: URL,
-    preferredLiveTranscript: String?
+    preferredLiveTranscript: String?,
+    liveTranscriptionRequest: LiveTranscriptionFinishRequest? = nil
   ) async throws -> String {
     if backend.liveTranscriptIsAuthoritative {
-      await backend.stopLiveTranscription()
+      let completedLiveTranscript = try await backend.finishLiveTranscription(
+        liveTranscriptionRequest
+          ?? LiveTranscriptionFinishRequest(
+            waitThroughAudioTime: nil,
+            includeAudioBeforeTime: nil
+          )
+      )
+      if let completedLiveTranscript {
+        let liveTranscript = completedLiveTranscript.trimmingCharacters(
+          in: .whitespacesAndNewlines
+        )
+        if !liveTranscript.isEmpty {
+          return liveTranscript
+        }
+      }
       if let preferredLiveTranscript {
         let liveTranscript = preferredLiveTranscript.trimmingCharacters(
           in: .whitespacesAndNewlines

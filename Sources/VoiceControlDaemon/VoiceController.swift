@@ -25,6 +25,7 @@ final class VoiceController {
   private var lastSpeechAt = Date()
   private var recordingStartedAt = Date()
   private var submitCutoffAudioTime: TimeInterval?
+  private var recordingStartAudioTime: TimeInterval?
   private var ignoreSilenceUntil = Date()
   private var heardPromptSpeech = false
   private var silenceTimer: Timer?
@@ -182,7 +183,7 @@ final class VoiceController {
       liveAudioRouter.route(to: liveInput)
       startLiveTranscription(input: liveInput)
       do {
-        try audio.beginRecording()
+        recordingStartAudioTime = try audio.beginRecording()
         NSSound(named: "Tink")?.play()
         startSilenceTimer()
         applyPendingPreview()
@@ -197,6 +198,9 @@ final class VoiceController {
       NSSound(named: "Pop")?.play()
       liveAudioRouter.finish()
       let requiresTrimmedRecording = submitCutoffAudioTime != nil
+      let liveTranscriptionRequest = makeLiveTranscriptionFinishRequest(
+        excludingSubmitPhrase: requiresTrimmedRecording
+      )
       let fileURL: URL?
       do {
         if let submitCutoffAudioTime {
@@ -209,6 +213,7 @@ final class VoiceController {
         return
       }
       self.submitCutoffAudioTime = nil
+      recordingStartAudioTime = nil
       guard let fileURL else {
         fail("No prompt recording was available")
         return
@@ -216,7 +221,11 @@ final class VoiceController {
       let preferredLiveTranscript = liveTranscript.textForSubmission(
         excludingLatestSeparatedBurst: requiresTrimmedRecording
       )
-      transcribe(fileURL, preferredLiveTranscript: preferredLiveTranscript)
+      transcribe(
+        fileURL,
+        preferredLiveTranscript: preferredLiveTranscript,
+        liveTranscriptionRequest: liveTranscriptionRequest
+      )
 
     case .cancelPromptRecording:
       silenceTimer?.invalidate()
@@ -465,13 +474,36 @@ final class VoiceController {
     silenceTimer = timer
   }
 
-  private func transcribe(_ fileURL: URL, preferredLiveTranscript: String) {
+  private func makeLiveTranscriptionFinishRequest(
+    excludingSubmitPhrase: Bool
+  ) -> LiveTranscriptionFinishRequest? {
+    guard let recordingStartAudioTime else { return nil }
+    let waitThroughAudioTime =
+      (excludingSubmitPhrase
+      ? speechBurstTracker.latestCompletedBurstEndAudioTime
+      : speechBurstTracker.latestSpeechEndAudioTime).map { max(0, $0 - recordingStartAudioTime) }
+    let includeAudioBeforeTime =
+      excludingSubmitPhrase
+      ? submitCutoffAudioTime.map { max(0, $0 - recordingStartAudioTime) }
+      : nil
+    return LiveTranscriptionFinishRequest(
+      waitThroughAudioTime: waitThroughAudioTime,
+      includeAudioBeforeTime: includeAudioBeforeTime
+    )
+  }
+
+  private func transcribe(
+    _ fileURL: URL,
+    preferredLiveTranscript: String,
+    liveTranscriptionRequest: LiveTranscriptionFinishRequest?
+  ) {
     Task { @MainActor in
       defer { try? FileManager.default.removeItem(at: fileURL) }
       do {
         let transcript = try await transcriber.transcribe(
           fileURL: fileURL,
-          preferredLiveTranscript: preferredLiveTranscript
+          preferredLiveTranscript: preferredLiveTranscript,
+          liveTranscriptionRequest: liveTranscriptionRequest
         )
         let cleaned = PhraseMatcher.cleanFinalTranscript(
           transcript,
@@ -637,6 +669,7 @@ final class VoiceController {
   }
 
   private func discardPromptRecording() {
+    recordingStartAudioTime = nil
     if let recordingURL = audio.finishRecording() {
       try? FileManager.default.removeItem(at: recordingURL)
     }

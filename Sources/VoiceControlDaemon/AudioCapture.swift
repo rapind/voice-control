@@ -176,7 +176,8 @@ final class AudioCapture {
     logger.notice("Audio engine started")
   }
 
-  func beginRecording() throws {
+  @discardableResult
+  func beginRecording() throws -> TimeInterval {
     let directory = FileManager.default.temporaryDirectory
       .appendingPathComponent("voice-control-prototype", isDirectory: true)
     try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -187,10 +188,12 @@ final class AudioCapture {
     let file = try AVAudioFile(forWriting: url, settings: format.settings)
 
     lock.lock()
+    let startAudioTime = totalCapturedTime
     recordingURL = url
     recordingFile = file
-    recordingStartAudioTime = totalCapturedTime
+    recordingStartAudioTime = startAudioTime
     lock.unlock()
+    return startAudioTime
   }
 
   func finishRecording() -> URL? {
@@ -281,7 +284,8 @@ struct SpeechBurstTracker {
 
   private(set) var currentBurstStartAudioTime: TimeInterval?
   private(set) var latestSeparatedBurstStartAudioTime: TimeInterval?
-  private var lastSpeechEndAudioTime: TimeInterval?
+  private(set) var latestCompletedBurstEndAudioTime: TimeInterval?
+  private(set) var latestSpeechEndAudioTime: TimeInterval?
 
   init(separatingSilence: TimeInterval) {
     self.separatingSilence = separatingSilence
@@ -290,7 +294,8 @@ struct SpeechBurstTracker {
   mutating func reset() {
     currentBurstStartAudioTime = nil
     latestSeparatedBurstStartAudioTime = nil
-    lastSpeechEndAudioTime = nil
+    latestCompletedBurstEndAudioTime = nil
+    latestSpeechEndAudioTime = nil
   }
 
   mutating func observe(
@@ -299,9 +304,10 @@ struct SpeechBurstTracker {
   ) {
     guard sample.levelDB >= speechThresholdDB else { return }
 
-    if let lastSpeechEndAudioTime {
-      let silence = sample.startTime - lastSpeechEndAudioTime
+    if let latestSpeechEndAudioTime {
+      let silence = sample.startTime - latestSpeechEndAudioTime
       if silence >= separatingSilence {
+        latestCompletedBurstEndAudioTime = latestSpeechEndAudioTime
         currentBurstStartAudioTime = sample.startTime
         latestSeparatedBurstStartAudioTime = sample.startTime
       }
@@ -309,7 +315,7 @@ struct SpeechBurstTracker {
       currentBurstStartAudioTime = sample.startTime
     }
 
-    lastSpeechEndAudioTime = sample.startTime + sample.duration
+    latestSpeechEndAudioTime = sample.startTime + sample.duration
   }
 }
 

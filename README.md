@@ -21,13 +21,13 @@ The working bundle is installed at:
 ~/Applications/Voice Control Prototype.app
 ```
 
-Launch it with Spotlight or:
+Start the installed launch service with:
 
 ```bash
-open "$HOME/Applications/Voice Control Prototype.app"
+launchctl kickstart -k "gui/$(id -u)/com.daverapin.voice-control-prototype"
 ```
 
-The local build uses a stable identifier-based designated requirement so macOS can preserve Accessibility permission across ad-hoc rebuilds. Install it at a stable path before granting permission.
+The launch service runs the executable inside this bundle directly. It restarts the app after a crash, but a successful exit from **Quit Voice Control** remains stopped until you start it again or rebuild it. The local build uses a stable identifier-based designated requirement so macOS can preserve Accessibility permission across ad-hoc rebuilds. Install it at a stable path before granting permission.
 
 ## Build during development
 
@@ -35,7 +35,7 @@ The local build uses a stable identifier-based designated requirement so macOS c
 ./run-prototype.sh
 ```
 
-The script rebuilds and replaces the same app bundle under `~/Applications`, then launches it. It does not leave a second development app registered with macOS.
+The script rebuilds and replaces the same app bundle under `~/Applications`, installs its launch service, and leaves it running. It does not leave a second development app registered with macOS.
 
 The editable configuration lives at:
 
@@ -122,7 +122,7 @@ Use another configuration file when launching if needed:
 
 On first launch, macOS asks for Microphone, Speech Recognition, and Accessibility permission. Accessibility is required for typing dictation, focusing applications, and sending keyboard shortcuts.
 
-The menu-bar item shows the current state and active control phrases. Use **Open Configuration** there to edit the TOML file. Quit it from that menu or press Control-C in the launching terminal.
+The menu-bar item shows the current state and active control phrases. Use **Open Configuration** there to edit the TOML file. Quit it from that menu. Because the launch service treats a successful exit as intentional, it will not immediately reopen the app.
 
 ## Application commands
 

@@ -3,6 +3,26 @@ import Testing
 
 @testable import VoiceControlDaemon
 
+@Test func audioTapInstallationReportsAnAVFAudioExceptionInsteadOfCrashing() throws {
+  let engine = AVAudioEngine()
+  let input = engine.inputNode
+  let hardwareFormat = input.inputFormat(forBus: 0)
+  try AudioTapInstaller.install(
+    on: input,
+    bufferSize: 512,
+    format: hardwareFormat
+  ) { _, _ in }
+  defer { input.removeTap(onBus: 0) }
+
+  #expect(throws: AudioCaptureError.self) {
+    try AudioTapInstaller.install(
+      on: input,
+      bufferSize: 512,
+      format: hardwareFormat
+    ) { _, _ in }
+  }
+}
+
 @Test func audioCaptureUsesAirPodsHardwareFormatForTapAndRecording() throws {
   let hardwareFormat = AVAudioFormat(standardFormatWithSampleRate: 24_000, channels: 1)!
   let staleClientFormat = AVAudioFormat(standardFormatWithSampleRate: 48_000, channels: 1)!

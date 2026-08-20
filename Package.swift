@@ -13,9 +13,15 @@ let package = Package(
     .package(url: "https://github.com/swiftlang/swift-testing.git", exact: "6.2.3"),
   ],
   targets: [
+    .target(
+      name: "AudioTapBridge",
+      path: "Sources/AudioTapBridge",
+      publicHeadersPath: "include"
+    ),
     .executableTarget(
       name: "VoiceControlDaemon",
       dependencies: [
+        "AudioTapBridge",
         .product(name: "FluidAudio", package: "FluidAudio"),
         .product(name: "TOMLDecoder", package: "TOMLDecoder"),
       ],

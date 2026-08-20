@@ -1,4 +1,5 @@
 import AVFoundation
+import AudioTapBridge
 import Foundation
 import OSLog
 
@@ -111,7 +112,11 @@ final class AudioCapture {
 
     if !tapInstalled {
       let deliveryFormat = formatPlan.recordingFormat
-      input.installTap(onBus: 0, bufferSize: 512, format: formatPlan.tapFormat) {
+      try AudioTapInstaller.install(
+        on: input,
+        bufferSize: 512,
+        format: formatPlan.tapFormat
+      ) {
         [weak self] buffer, _ in
         guard let self else { return }
         guard
@@ -249,6 +254,19 @@ final class AudioCapture {
     let samples = UnsafeBufferPointer(start: channels[0], count: Int(buffer.frameLength))
     let meanSquare = samples.reduce(Float.zero) { $0 + ($1 * $1) } / Float(samples.count)
     return 20 * log10(max(sqrt(meanSquare), 0.000_001))
+  }
+}
+
+enum AudioTapInstaller {
+  static func install(
+    on node: AVAudioNode,
+    bufferSize: AVAudioFrameCount,
+    format: AVAudioFormat,
+    block: @escaping AVAudioNodeTapBlock
+  ) throws {
+    if let reason = VCInstallAudioTap(node, 0, bufferSize, format, block) {
+      throw AudioCaptureError("Could not install microphone tap: \(reason)")
+    }
   }
 }
 

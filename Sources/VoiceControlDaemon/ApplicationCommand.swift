@@ -13,6 +13,7 @@ enum ApplicationCommand: Equatable, Hashable {
   case scrollUp
   case scrollDown
   case scrollEnd
+  case launchMusic
   case playMusic
   case pauseMusic
   case nextSong
@@ -29,7 +30,7 @@ enum ApplicationCommand: Equatable, Hashable {
     case .focusItem(let number):
       return (1...8).contains(number)
     case .scrollUp, .scrollDown, .scrollEnd,
-      .playMusic, .pauseMusic, .nextSong, .previousSong:
+      .launchMusic, .playMusic, .pauseMusic, .nextSong, .previousSong:
       return true
     default:
       return false

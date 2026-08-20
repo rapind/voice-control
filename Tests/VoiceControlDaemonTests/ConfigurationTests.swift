@@ -113,6 +113,7 @@ import Testing
 @Test func defaultsParseYouTubeMusicControlsFromEverySupportedApplication() throws {
   let configuration = try Configuration.decodeTOML(Data())
   let expectedCommands: [(String, ApplicationCommand)] = [
+    ("media launch", .launchMusic),
     ("media play", .playMusic),
     ("media pause", .pauseMusic),
     ("media next", .nextSong),

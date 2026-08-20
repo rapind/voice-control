@@ -488,6 +488,12 @@ final class VoiceController {
   }
 
   private func execute(_ command: ApplicationCommand) {
+    if command == .launchMusic {
+      applicationController.launchYouTubeMusic { [weak self] result in
+        self?.completeApplicationOperation(result)
+      }
+      return
+    }
     if command.isMusicCommand {
       applicationController.executeMediaCommand(command) { [weak self] result in
         self?.completeApplicationOperation(result)

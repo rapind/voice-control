@@ -135,6 +135,7 @@ struct CommandPhrases: Equatable {
 
 struct Configuration: Equatable {
   private static let musicMappings: [(ApplicationCommand, [String])] = [
+    (.launchMusic, ["media launch"]),
     (.playMusic, ["media play"]),
     (.pauseMusic, ["media pause"]),
     (.nextSong, ["media next"]),

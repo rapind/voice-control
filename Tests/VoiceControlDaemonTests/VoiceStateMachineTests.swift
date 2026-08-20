@@ -27,6 +27,7 @@ import Testing
   #expect(ApplicationCommand.pauseMusic.isDirectCommand)
   #expect(ApplicationCommand.nextSong.isDirectCommand)
   #expect(ApplicationCommand.previousSong.isDirectCommand)
+  #expect(ApplicationCommand.launchMusic.isDirectCommand)
   #expect(!ApplicationCommand.newChat.isDirectCommand)
 }
 

@@ -9,6 +9,9 @@ struct CapturedApplication {
 }
 
 final class ApplicationController {
+  static let youtubeMusicBundleIdentifier =
+    "com.google.Chrome.app.cinhimbnkkaeohfgghhklpknlkffjgod"
+
   private let logger = Logger(
     subsystem: "com.daverapin.voice-control-prototype",
     category: "ApplicationController"
@@ -215,6 +218,52 @@ final class ApplicationController {
     completion(.success(()))
   }
 
+  func launchYouTubeMusic(completion: @escaping (Result<Void, Error>) -> Void) {
+    let previousApplication = NSWorkspace.shared.frontmostApplication
+
+    if let application = NSRunningApplication.runningApplications(
+      withBundleIdentifier: Self.youtubeMusicBundleIdentifier
+    ).first {
+      application.activate(options: [.activateAllWindows])
+      restoreFocus(to: previousApplication, completion: completion)
+      return
+    }
+    guard
+      let applicationURL = NSWorkspace.shared.urlForApplication(
+        withBundleIdentifier: Self.youtubeMusicBundleIdentifier)
+    else {
+      completion(.failure(InjectionError("The YouTube Music app is not installed")))
+      return
+    }
+    let configuration = NSWorkspace.OpenConfiguration()
+    configuration.activates = true
+    NSWorkspace.shared.openApplication(at: applicationURL, configuration: configuration) {
+      _, error in
+      if let error {
+        completion(.failure(error))
+      } else {
+        self.restoreFocus(to: previousApplication, completion: completion)
+      }
+    }
+  }
+
+  private func restoreFocus(
+    to application: NSRunningApplication?,
+    completion: @escaping (Result<Void, Error>) -> Void
+  ) {
+    DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
+      guard let application, !application.isTerminated else {
+        completion(.success(()))
+        return
+      }
+      guard application.activate(options: [.activateAllWindows]) else {
+        completion(.failure(InjectionError("Could not restore the previous application")))
+        return
+      }
+      completion(.success(()))
+    }
+  }
+
   func mediaKeyType(for command: ApplicationCommand) -> Int? {
     switch command {
     case .playMusic, .pauseMusic: return 16
@@ -358,7 +407,7 @@ final class ApplicationController {
       return nil
     case .scrollUp, .scrollDown, .scrollEnd:
       return nil
-    case .playMusic, .pauseMusic, .nextSong, .previousSong:
+    case .launchMusic, .playMusic, .pauseMusic, .nextSong, .previousSong:
       return nil
     case .focusItem(let number):
       let keyCodes: [Int: CGKeyCode] = [

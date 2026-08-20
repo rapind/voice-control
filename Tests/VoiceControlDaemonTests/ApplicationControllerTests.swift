@@ -90,3 +90,10 @@ import Testing
   #expect(controller.mediaKeyType(for: .previousSong) == 18)
   #expect(controller.mediaKeyType(for: .scrollDown) == nil)
 }
+
+@Test func youtubeMusicUsesTheInstalledChromeAppBundle() {
+  #expect(
+    ApplicationController.youtubeMusicBundleIdentifier
+      == "com.google.Chrome.app.cinhimbnkkaeohfgghhklpknlkffjgod"
+  )
+}

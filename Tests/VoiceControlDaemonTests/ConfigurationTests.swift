@@ -691,7 +691,7 @@ import Testing
   #expect(preview.text == "open the read tab")
 }
 
-@Test func replacesLivePreviewWithFinalTranscript() {
+@Test func appliesARevisedLiveTranscript() {
   var preview = TranscriptPreview()
   _ = preview.replace(with: "draft trans script")
 

@@ -32,7 +32,7 @@ final class VoiceController {
   private var audioRestartWorkItem: DispatchWorkItem?
   private var lastKeywordTranscript = ""
   private var preview = TranscriptPreview()
-  private var pendingPreviewText = ""
+  private var liveTranscript = LiveTranscriptCheckpoint()
   private var previewReady = false
   private var ambientNoiseFloor = AmbientNoiseFloor()
   private var speechBurstTracker = SpeechBurstTracker(separatingSilence: 0.6)
@@ -176,7 +176,7 @@ final class VoiceController {
       speechBurstTracker.reset()
       heardPromptSpeech = false
       preview = TranscriptPreview()
-      pendingPreviewText = ""
+      liveTranscript = LiveTranscriptCheckpoint()
       previewReady = targetPID != nil
       let liveInput = LiveAudioBufferSink()
       liveAudioRouter.route(to: liveInput)
@@ -213,7 +213,10 @@ final class VoiceController {
         fail("No prompt recording was available")
         return
       }
-      transcribe(fileURL, discardLiveTranscript: requiresTrimmedRecording)
+      let preferredLiveTranscript = liveTranscript.textForSubmission(
+        excludingLatestSeparatedBurst: requiresTrimmedRecording
+      )
+      transcribe(fileURL, preferredLiveTranscript: preferredLiveTranscript)
 
     case .cancelPromptRecording:
       silenceTimer?.invalidate()
@@ -360,7 +363,7 @@ final class VoiceController {
 
   private func handleLiveTranscript(_ text: String) {
     guard machine.phase == .recording else { return }
-    pendingPreviewText = text.trimmingCharacters(in: .whitespacesAndNewlines)
+    liveTranscript.update(text.trimmingCharacters(in: .whitespacesAndNewlines))
     applyPendingPreview()
   }
 
@@ -384,7 +387,13 @@ final class VoiceController {
       let thresholdDB = ambientNoiseFloor.speechThreshold(
         fallback: configuration.silenceThresholdDB
       )
+      let previousSeparatedBurstStart = speechBurstTracker.latestSeparatedBurstStartAudioTime
       speechBurstTracker.observe(sample, speechThresholdDB: thresholdDB)
+      if speechBurstTracker.latestSeparatedBurstStartAudioTime
+        != previousSeparatedBurstStart
+      {
+        liveTranscript.beginSeparatedSpeechBurst()
+      }
       guard sample.levelDB >= thresholdDB else { return }
       heardPromptSpeech = true
       lastSpeechAt = Date()
@@ -396,7 +405,7 @@ final class VoiceController {
   private func applyPendingPreview() {
     guard machine.phase == .recording, previewReady else { return }
     var nextPreview = preview
-    let edit = nextPreview.replace(with: pendingPreviewText)
+    let edit = nextPreview.replace(with: liveTranscript.latestText)
     guard edit.deleteCount > 0 || !edit.insertion.isEmpty else { return }
     switch applicationController.applyPreviewEdit(
       edit,
@@ -410,7 +419,7 @@ final class VoiceController {
   }
 
   private func clearLivePreview() -> Result<Void, Error> {
-    pendingPreviewText = ""
+    liveTranscript.update("")
     guard previewReady else {
       preview = TranscriptPreview()
       return .success(())
@@ -456,13 +465,13 @@ final class VoiceController {
     silenceTimer = timer
   }
 
-  private func transcribe(_ fileURL: URL, discardLiveTranscript: Bool = false) {
+  private func transcribe(_ fileURL: URL, preferredLiveTranscript: String) {
     Task { @MainActor in
       defer { try? FileManager.default.removeItem(at: fileURL) }
       do {
         let transcript = try await transcriber.transcribe(
           fileURL: fileURL,
-          discardLiveTranscript: discardLiveTranscript
+          preferredLiveTranscript: preferredLiveTranscript
         )
         let cleaned = PhraseMatcher.cleanFinalTranscript(
           transcript,

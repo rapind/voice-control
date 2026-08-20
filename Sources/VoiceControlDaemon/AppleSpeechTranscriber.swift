@@ -5,6 +5,7 @@ import Speech
 @available(macOS 26.0, *)
 actor AppleSpeechTranscriber: PromptTranscriberBackend {
   nonisolated let name = "Apple Speech progressive transcription"
+  nonisolated let liveTranscriptIsAuthoritative = true
 
   private var locale: Locale?
   private var analyzer: SpeechAnalyzer?

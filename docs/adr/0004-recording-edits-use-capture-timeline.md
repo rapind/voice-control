@@ -12,14 +12,18 @@ The submit phrase is detected from Apple Speech text, but its recording cutoff d
 
 Instead, audio-level samples identify speech bursts on the capture timeline. When Apple Speech recognizes a submit phrase, the recording is cut just before the latest speech burst that follows a distinct period of silence. If there is no distinct later burst, the daemon keeps the full recording and removes the trailing submit phrase from the final text rather than risking deletion of the prompt.
 
-When a recording is cut, final transcription reads the cut file instead of returning the already-produced live transcript. An empty cut is rejected before file transcription.
+Apple progressive transcription treats the latest live preview as the authoritative prompt. When a new speech burst begins after a distinct period of silence, the daemon checkpoints the preview before that burst. If the burst is recognized as the submit phrase, the checkpoint is submitted, so a misrecognition such as `Sunday` does not leak into the prompt. Silence submission uses the latest live revision. Apple finalization and file retranscription are skipped unless live recognition produced no usable text.
+
+The Parakeet fallback continues to transcribe the finished file because its rolling live preview is intended as feedback rather than its authoritative full-context result. An empty cut is rejected before any fallback file transcription.
 
 ## Consequences
 
 - Recognition-request timestamps may be used to describe stabilized recognition results, but never to edit captured audio.
 - Recognition task recycling and input-device changes cannot put a recording cutoff on a different clock from the recording itself.
 - A brief pause before the submit phrase gives the cleanest audio cut.
-- Continuous speech ending in a submit phrase may leave that phrase in the audio sent to transcription, but final text cleanup still removes it.
+- A brief pause before the submit phrase also provides a live-text checkpoint that excludes the phrase even when Apple spells it incorrectly.
+- Continuous speech ending in a submit phrase has no separate checkpoint, so final text cleanup can remove only recognized submit aliases.
+- Apple’s final pass cannot replace a useful live preview with a contextually worse guess. The target LLM receives the latest useful speech recognition text and can interpret it using conversation context.
 - A bad cutoff fails explicitly instead of sending an empty audio file to a transcriber that may wait indefinitely.
 
 ## References

@@ -4,6 +4,7 @@ import Foundation
 
 protocol PromptTranscriberBackend: Sendable {
   var name: String { get }
+  var liveTranscriptIsAuthoritative: Bool { get }
 
   func prepare() async throws
   func startLiveTranscription(
@@ -14,6 +15,30 @@ protocol PromptTranscriberBackend: Sendable {
   func stopLiveTranscription() async
   func transcribe(fileURL: URL) async throws -> String
   func updateContextualStrings(_ contextualStrings: [String]) async
+}
+
+extension PromptTranscriberBackend {
+  var liveTranscriptIsAuthoritative: Bool { false }
+}
+
+struct LiveTranscriptCheckpoint {
+  private(set) var latestText = ""
+  private var textBeforeLatestSeparatedBurst: String?
+
+  mutating func update(_ text: String) {
+    latestText = text
+  }
+
+  mutating func beginSeparatedSpeechBurst() {
+    textBeforeLatestSeparatedBurst = latestText
+  }
+
+  func textForSubmission(excludingLatestSeparatedBurst: Bool) -> String {
+    if excludingLatestSeparatedBurst, let textBeforeLatestSeparatedBurst {
+      return textBeforeLatestSeparatedBurst
+    }
+    return latestText
+  }
 }
 
 final class PromptTranscriber {
@@ -64,10 +89,18 @@ final class PromptTranscriber {
 
   func transcribe(
     fileURL: URL,
-    discardLiveTranscript: Bool = false
+    preferredLiveTranscript: String?
   ) async throws -> String {
-    if discardLiveTranscript {
+    if backend.liveTranscriptIsAuthoritative {
       await backend.stopLiveTranscription()
+      if let preferredLiveTranscript {
+        let liveTranscript = preferredLiveTranscript.trimmingCharacters(
+          in: .whitespacesAndNewlines
+        )
+        if !liveTranscript.isEmpty {
+          return liveTranscript
+        }
+      }
     }
     return try await backend.transcribe(fileURL: fileURL)
   }

@@ -142,14 +142,14 @@ For Ghostty, `new tab` creates and focuses a Herdr workspace through Herdr's API
 
 `scroll up` and `scroll down` send mouse scroll wheel events to the center of the frontmost window, so they scroll whatever is on screen without moving the cursor or changing focus.
 
-All other speech remains a normal prompt. On macOS 26, Apple progressive results revise the visible text while recording and finalize through the end of the same audio stream. On macOS 14 and 15, rolling full-context Parakeet passes provide the preview and a final file pass remains authoritative.
+All other speech remains a normal prompt. On macOS 26, Apple progressive results revise the visible text while recording, and the last useful live revision is authoritative. Voice Control does not ask Apple to rewrite it during a final pass. On macOS 14 and 15, rolling full-context Parakeet passes provide the preview and a final file pass remains authoritative.
 
-The configured submit phrase creates an audio cutoff. The phrase itself and anything spoken after it are excluded from final transcription. Say a configured cancel phrase to clear the live preview, discard the recording, and return to wake listening without submitting.
+The configured submit phrase creates an audio cutoff. After a brief pause, Voice Control also checkpoints the live preview before the submit phrase begins, so the phrase and anything spoken after it are excluded even when Apple spells the phrase incorrectly. Say a configured cancel phrase to clear the live preview, discard the recording, and return to wake listening without submitting.
 
 ## Operational limits
 
 - Dictation stays bound to the window captured at wake time. Changing windows during recording stops live typing rather than redirecting text.
-- Apple Speech preview results may revise earlier words until stream finalization. The Parakeet fallback updates about every 1.5 seconds and replaces its preview with the final full-context pass.
+- Apple Speech preview results may revise earlier words while recording, but Voice Control submits the last useful live revision without Apple’s final rewrite. The Parakeet fallback updates about every 1.5 seconds and replaces its preview with the final full-context pass.
 - Live preview typing stops rather than sending text to an application that is no longer frontmost.
 - Model downloading and Hugging Face authentication are deliberately out of scope for the Parakeet fallback. It fails clearly when the shared cached model is missing. Apple Speech assets are installed through `AssetInventory`.
 - Apple voice processing can be enabled with `voice_processing = true`, but it is disabled by default because its call-oriented filtering weakens far-field dictation. When enabled, its multichannel device output is normalized to mono before recognition and recording.

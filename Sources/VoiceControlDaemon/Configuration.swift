@@ -134,6 +134,13 @@ struct CommandPhrases: Equatable {
 }
 
 struct Configuration: Equatable {
+  private static let musicMappings: [(ApplicationCommand, [String])] = [
+    (.playMusic, ["media play"]),
+    (.pauseMusic, ["media pause"]),
+    (.nextSong, ["media next"]),
+    (.previousSong, ["media previous"]),
+  ]
+
   var wakePhrases: [String]
   var submitPhrases: [String]
   var cancelPhrases: [String]
@@ -444,9 +451,11 @@ struct Configuration: Equatable {
     }
     guard let sessionTarget else {
       return globalFocusMappings
+        + Self.musicMappings
         + ApplicationTarget.allCases.flatMap { applicationCommands[$0]!.directMappings }
     }
-    return globalFocusMappings + applicationCommands[sessionTarget]!.nonFocusMappings
+    return globalFocusMappings + Self.musicMappings
+      + applicationCommands[sessionTarget]!.nonFocusMappings
   }
 
   private static func controlPhrases(_ phrases: [String], name: String) throws -> [String] {

@@ -80,3 +80,13 @@ import Testing
   #expect(controller.textToSubmit(for: .startSession, target: .ghostty) == "omp")
   #expect(controller.textToSubmit(for: .startSession, target: .chrome) == nil)
 }
+
+@Test func musicControlsUseSystemMediaEvents() throws {
+  let controller = ApplicationController()
+
+  #expect(controller.mediaKeyType(for: .playMusic) == 16)
+  #expect(controller.mediaKeyType(for: .pauseMusic) == 16)
+  #expect(controller.mediaKeyType(for: .nextSong) == 17)
+  #expect(controller.mediaKeyType(for: .previousSong) == 18)
+  #expect(controller.mediaKeyType(for: .scrollDown) == nil)
+}

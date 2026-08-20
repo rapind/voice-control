@@ -200,6 +200,57 @@ final class ApplicationController {
     completion(.success(()))
   }
 
+  func executeMediaCommand(
+    _ command: ApplicationCommand,
+    completion: @escaping (Result<Void, Error>) -> Void
+  ) {
+    guard let keyType = mediaKeyType(for: command) else {
+      completion(.failure(InjectionError("Unsupported media command")))
+      return
+    }
+    guard postMediaKey(type: keyType) else {
+      completion(.failure(InjectionError("Could not send the media command")))
+      return
+    }
+    completion(.success(()))
+  }
+
+  func mediaKeyType(for command: ApplicationCommand) -> Int? {
+    switch command {
+    case .playMusic, .pauseMusic: return 16
+    case .nextSong: return 17
+    case .previousSong: return 18
+    default: return nil
+    }
+  }
+
+  private func postMediaKey(type: Int) -> Bool {
+    func post(state: Int) -> Bool {
+      let data = (type << 16) | (state << 8)
+      guard
+        let event = NSEvent.otherEvent(
+          with: .systemDefined,
+          location: .zero,
+          modifierFlags: NSEvent.ModifierFlags(rawValue: 0xa00),
+          timestamp: 0,
+          windowNumber: 0,
+          context: nil,
+          subtype: 8,
+          data1: data,
+          data2: -1
+        )?.cgEvent
+      else {
+        return false
+      }
+      event.post(tap: .cghidEventTap)
+      return true
+    }
+
+    guard post(state: 0xa) else { return false }
+    usleep(10_000)
+    return post(state: 0xb)
+  }
+
   private func requestFocus(_ app: NSRunningApplication, target: ApplicationTarget) throws {
     guard let bundleIdentifier = app.bundleIdentifier,
       target.bundleIdentifiers.contains(bundleIdentifier)
@@ -306,6 +357,8 @@ final class ApplicationController {
     case .interruptSession, .startSession, .shareSession, .stopSharing:
       return nil
     case .scrollUp, .scrollDown, .scrollEnd:
+      return nil
+    case .playMusic, .pauseMusic, .nextSong, .previousSong:
       return nil
     case .focusItem(let number):
       let keyCodes: [Int: CGKeyCode] = [

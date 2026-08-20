@@ -112,7 +112,7 @@ Save the file and the app applies valid changes within about one second. You do 
 
 The wake phrase starts recording without changing focus. Dictation is bound to whichever window was frontmost when recording started. Application-focus phrases, `focus ghost tee`, `focus chat`, and `focus chrome`, execute after a wake phrase.
 
-`focus one` or `folk one` through eight and the scroll commands execute directly from idle. In Ghostty, numbered focus commands send Control+Option+1 through Control+Option+8, and in ChatGPT or Chrome they send Command+1 through Command+8. `scroll up` and `scroll down` send mouse wheel events to the frontmost window. If another application was frontmost, the phrase is consumed without sending a keyboard shortcut.
+`focus one` or `folk one` through eight, the scroll commands, and the media commands execute directly from idle. In Ghostty, numbered focus commands send Control+Option+1 through Control+Option+8, and in ChatGPT or Chrome they send Command+1 through Command+8. `scroll up` and `scroll down` send mouse wheel events to the frontmost window. If another application was frontmost, the phrase is consumed without sending a keyboard shortcut.
 
 Use another configuration file when launching if needed:
 
@@ -126,7 +126,7 @@ The menu-bar item shows the current state and active control phrases. Use **Open
 
 ## Application commands
 
-The wake phrase starts recording. Once recording, command aliases execute immediately from Apple Speech partials and do not require a submit phrase. `focus one` or `folk one` through eight, `scroll up`, and `scroll down` are the exception: they execute directly from idle without the wake phrase.
+The wake phrase starts recording. Once recording, command aliases execute immediately from Apple Speech partials and do not require a submit phrase. `focus one` or `folk one` through eight, the scroll commands, and the media commands are the exception: they execute directly from idle without the wake phrase.
 
 Ghostty, ChatGPT, and Chrome support:
 
@@ -135,6 +135,8 @@ Ghostty, ChatGPT, and Chrome support:
 - Their global application focus phrase
 
 ChatGPT also supports `scroll end`, which jumps toward the latest generated output.
+
+`media play`, `media pause`, `media next`, and `media previous` send macOS system media events without changing application focus. They control the current macOS media session, which works with the installed YouTube Music web app once it owns that session. `media play` and `media pause` both send the system play/pause toggle because macOS does not expose separate play and pause media keys.
 
 For Ghostty, `new tab` creates and focuses a Herdr workspace through Herdr's API, while `close tab` closes the focused Herdr workspace. `clear context` sends `/clear`, and `compact context` sends `/compact`; both press Return. `quit session` sends Control-D to the foreground terminal process. `start session` types `omp` and presses Return. `share session` sends `/collab` and `stop sharing` sends `/collab stop`, each followed by Return. Numbered focus commands send Control+Option+1 through Control+Option+9, matching the configured Herdr workspace bindings. For ChatGPT, `new tab` sends Command-N, `close tab` sends Command-W, and `clear context` submits `/clear`. Chrome does not define new or close tab commands. Numbered focus commands in ChatGPT and Chrome send Command-1 through Command-9.
 
@@ -152,4 +154,5 @@ The configured submit phrase creates an audio cutoff. The phrase itself and anyt
 - Model downloading and Hugging Face authentication are deliberately out of scope for the Parakeet fallback. It fails clearly when the shared cached model is missing. Apple Speech assets are installed through `AssetInventory`.
 - Apple voice processing can be enabled with `voice_processing = true`, but it is disabled by default because its call-oriented filtering weakens far-field dictation. When enabled, its multichannel device output is normalized to mono before recognition and recording.
 - Silence detection measures the processed room noise while waiting for the wake phrase and sets its speech threshold 8 dB above that floor. `silence_threshold_db` is used until calibration completes.
+- Media commands target whichever application currently owns the macOS media session. They do not launch YouTube Music or choose a playlist when no media session exists.
 - The app is ad-hoc signed with a stable identifier-only designated requirement. This avoids a paid Apple developer account and should preserve Accessibility approval across local rebuilds. It is appropriate for this private local tool, but weaker than certificate-backed signing because another local app using the same bundle identifier could satisfy the requirement.

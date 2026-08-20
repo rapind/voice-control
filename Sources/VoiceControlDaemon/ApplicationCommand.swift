@@ -13,6 +13,10 @@ enum ApplicationCommand: Equatable, Hashable {
   case scrollUp
   case scrollDown
   case scrollEnd
+  case playMusic
+  case pauseMusic
+  case nextSong
+  case previousSong
   case focusItem(Int)
 
   var focusTarget: ApplicationTarget? {
@@ -24,7 +28,17 @@ enum ApplicationCommand: Equatable, Hashable {
     switch self {
     case .focusItem(let number):
       return (1...8).contains(number)
-    case .scrollUp, .scrollDown, .scrollEnd:
+    case .scrollUp, .scrollDown, .scrollEnd,
+      .playMusic, .pauseMusic, .nextSong, .previousSong:
+      return true
+    default:
+      return false
+    }
+  }
+
+  var isMusicCommand: Bool {
+    switch self {
+    case .playMusic, .pauseMusic, .nextSong, .previousSong:
       return true
     default:
       return false

@@ -110,6 +110,37 @@ import Testing
   )
 }
 
+@Test func defaultsParseYouTubeMusicControlsFromEverySupportedApplication() throws {
+  let configuration = try Configuration.decodeTOML(Data())
+  let expectedCommands: [(String, ApplicationCommand)] = [
+    ("media play", .playMusic),
+    ("media pause", .pauseMusic),
+    ("media next", .nextSong),
+    ("media previous", .previousSong),
+  ]
+
+  for target in ApplicationTarget.allCases {
+    let mappings = configuration.commandMappings(for: target)
+    for (phrase, expectedCommand) in expectedCommands {
+      #expect(
+        ApplicationCommand.parse(
+          phrase, wakePhrases: configuration.wakePhrases, mappings: mappings)
+          == expectedCommand
+      )
+    }
+  }
+
+  let mappings = configuration.commandMappings(for: .chatGPT)
+  #expect(
+    ApplicationCommand.parse(
+      "play music", wakePhrases: configuration.wakePhrases, mappings: mappings) == nil
+  )
+  #expect(
+    ApplicationCommand.parse(
+      "next song", wakePhrases: configuration.wakePhrases, mappings: mappings) == nil
+  )
+}
+
 @Test func commandsFollowFrontmostTargetInsteadOfConfiguredTarget() throws {
   let configuration = try Configuration.decodeTOML(
     Data(

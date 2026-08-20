@@ -23,6 +23,10 @@ import Testing
   #expect(ApplicationCommand.scrollUp.isDirectCommand)
   #expect(ApplicationCommand.scrollDown.isDirectCommand)
   #expect(ApplicationCommand.scrollEnd.isDirectCommand)
+  #expect(ApplicationCommand.playMusic.isDirectCommand)
+  #expect(ApplicationCommand.pauseMusic.isDirectCommand)
+  #expect(ApplicationCommand.nextSong.isDirectCommand)
+  #expect(ApplicationCommand.previousSong.isDirectCommand)
   #expect(!ApplicationCommand.newChat.isDirectCommand)
 }
 

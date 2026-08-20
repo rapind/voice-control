@@ -488,6 +488,12 @@ final class VoiceController {
   }
 
   private func execute(_ command: ApplicationCommand) {
+    if command.isMusicCommand {
+      applicationController.executeMediaCommand(command) { [weak self] result in
+        self?.completeApplicationOperation(result)
+      }
+      return
+    }
     guard let commandTarget = command.target(frontmost: sessionTarget) else {
       print("Command ignored because the captured application is unsupported: \(command)")
       completeApplicationOperation(.success(()))

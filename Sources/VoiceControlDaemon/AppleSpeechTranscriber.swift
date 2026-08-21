@@ -59,7 +59,7 @@ actor AppleSpeechTranscriber: PromptTranscriberBackend {
 
   func startLiveTranscription(
     input: LiveAudioBufferSink,
-    onUpdate: @escaping @MainActor @Sendable (String) -> Void,
+    onUpdate: @escaping @MainActor @Sendable (LiveTranscriptionUpdate) -> Void,
     onError: @escaping @MainActor @Sendable (String) -> Void
   ) async throws {
     await stopLiveTranscription()
@@ -119,7 +119,12 @@ actor AppleSpeechTranscriber: PromptTranscriberBackend {
             latestResultAudioEnd = max(latestResultAudioEnd ?? 0, resultEnd)
           }
           resumeProgressiveResultWaiterIfCovered()
-          await onUpdate(finalizedText + volatileText)
+          await onUpdate(
+            LiveTranscriptionUpdate(
+              text: finalizedText + volatileText,
+              audioEndTime: latestResultAudioEnd
+            )
+          )
         }
       } catch is CancellationError {
         return
@@ -304,10 +309,12 @@ actor AppleSpeechTranscriber: PromptTranscriberBackend {
   }
 
   private func progressiveResultCovers(_ target: TimeInterval) -> Bool {
-    guard let latestResultAudioEnd else { return false }
     // Audio-level speech boundaries include the tail of the capture buffer.
     // Speech's word range normally ends a little earlier than that boundary.
-    return latestResultAudioEnd + 0.25 >= target
+    return ProgressiveResultCoverage.covers(
+      audioEndTime: latestResultAudioEnd,
+      target: target
+    )
   }
 
   private func resumeProgressiveResultWaiterIfCovered() {

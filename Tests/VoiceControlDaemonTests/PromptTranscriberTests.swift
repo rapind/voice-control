@@ -6,14 +6,15 @@ import Testing
 
 @Test func separatelySpokenSubmitPhraseUsesTheLiveTranscriptBeforeThatBurst() {
   var transcript = LiveTranscriptCheckpoint()
-  transcript.update("store this value as an array")
+  transcript.update("store this value as an array", audioEndTime: 3.9)
   transcript.beginSeparatedSpeechBurst()
-  transcript.update("store this value as an array Sunday")
+  transcript.update("store this value as an array Sunday", audioEndTime: 5.2)
 
   #expect(
     transcript.textForSubmission(excludingLatestSeparatedBurst: true)
       == "store this value as an array"
   )
+  #expect(transcript.audioEndTimeForSubmission(excludingLatestSeparatedBurst: true) == 3.9)
 }
 
 @Test func silenceSubmissionUsesTheLatestLiveRevision() {
@@ -67,6 +68,7 @@ import Testing
   let result = try await transcriber.transcribe(
     fileURL: fileURL,
     preferredLiveTranscript: "store these values as an array",
+    preferredLiveTranscriptAudioEndTime: 3,
     liveTranscriptionRequest: LiveTranscriptionFinishRequest(
       waitThroughAudioTime: 4.2,
       includeAudioBeforeTime: 5.0
@@ -75,6 +77,31 @@ import Testing
 
   #expect(result == "store these values as an array then iterate over the array")
   #expect(await backend.finishedLiveTranscriptCutoffs == [4.2])
+  #expect(await backend.transcribedURLs.isEmpty)
+}
+
+@Test func authoritativeLiveTranscriptPreservesTheVisiblePreviewWhenItAlreadyCoveredThePrompt()
+  async throws
+{
+  let backend = PromptTranscriberBackendSpy(
+    liveTranscriptIsAuthoritative: true,
+    completedLiveTranscript: "Are we committed and pushed"
+  )
+  let transcriber = PromptTranscriber(backend: backend)
+  let fileURL = URL(fileURLWithPath: "/tmp/ignored-prompt.wav")
+
+  let result = try await transcriber.transcribe(
+    fileURL: fileURL,
+    preferredLiveTranscript: "Are we committed and pushed?",
+    preferredLiveTranscriptAudioEndTime: 4.1,
+    liveTranscriptionRequest: LiveTranscriptionFinishRequest(
+      waitThroughAudioTime: 4.2,
+      includeAudioBeforeTime: nil
+    )
+  )
+
+  #expect(result == "Are we committed and pushed?")
+  #expect(await backend.finishedLiveTranscriptCutoffs == [nil])
   #expect(await backend.transcribedURLs.isEmpty)
 }
 
@@ -140,7 +167,7 @@ private actor PromptTranscriberBackendSpy: PromptTranscriberBackend {
 
   func startLiveTranscription(
     input: LiveAudioBufferSink,
-    onUpdate: @escaping @MainActor @Sendable (String) -> Void,
+    onUpdate: @escaping @MainActor @Sendable (LiveTranscriptionUpdate) -> Void,
     onError: @escaping @MainActor @Sendable (String) -> Void
   ) async throws {}
 

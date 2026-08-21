@@ -223,9 +223,13 @@ final class VoiceController {
       let preferredLiveTranscript = liveTranscript.textForSubmission(
         excludingLatestSeparatedBurst: requiresTrimmedRecording
       )
+      let preferredLiveTranscriptAudioEndTime = liveTranscript.audioEndTimeForSubmission(
+        excludingLatestSeparatedBurst: requiresTrimmedRecording
+      )
       transcribe(
         fileURL,
         preferredLiveTranscript: preferredLiveTranscript,
+        preferredLiveTranscriptAudioEndTime: preferredLiveTranscriptAudioEndTime,
         liveTranscriptionRequest: liveTranscriptionRequest,
         explicitSubmitDetected: explicitSubmitDetected
       )
@@ -364,8 +368,8 @@ final class VoiceController {
       do {
         try await transcriber.startLiveTranscription(
           input: input,
-          onUpdate: { [weak self] text in
-            self?.handleLiveTranscript(text)
+          onUpdate: { [weak self] update in
+            self?.handleLiveTranscript(update)
           },
           onError: { [weak self] message in
             guard let self, self.machine.phase == .recording else { return }
@@ -416,9 +420,12 @@ final class VoiceController {
     }
   }
 
-  private func handleLiveTranscript(_ text: String) {
+  private func handleLiveTranscript(_ update: LiveTranscriptionUpdate) {
     guard machine.phase == .recording else { return }
-    liveTranscript.update(text.trimmingCharacters(in: .whitespacesAndNewlines))
+    liveTranscript.update(
+      update.text.trimmingCharacters(in: .whitespacesAndNewlines),
+      audioEndTime: update.audioEndTime
+    )
     applyPendingPreview()
   }
 
@@ -552,6 +559,7 @@ final class VoiceController {
   private func transcribe(
     _ fileURL: URL,
     preferredLiveTranscript: String,
+    preferredLiveTranscriptAudioEndTime: TimeInterval?,
     liveTranscriptionRequest: LiveTranscriptionFinishRequest?,
     explicitSubmitDetected: Bool
   ) {
@@ -561,6 +569,7 @@ final class VoiceController {
         let transcript = try await transcriber.transcribe(
           fileURL: fileURL,
           preferredLiveTranscript: preferredLiveTranscript,
+          preferredLiveTranscriptAudioEndTime: preferredLiveTranscriptAudioEndTime,
           liveTranscriptionRequest: liveTranscriptionRequest
         )
         let cleaned = PhraseMatcher.cleanFinalTranscript(

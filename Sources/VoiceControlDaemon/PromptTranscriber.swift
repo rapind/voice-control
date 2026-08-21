@@ -9,7 +9,7 @@ protocol PromptTranscriberBackend: Sendable {
   func prepare() async throws
   func startLiveTranscription(
     input: LiveAudioBufferSink,
-    onUpdate: @escaping @MainActor @Sendable (String) -> Void,
+    onUpdate: @escaping @MainActor @Sendable (LiveTranscriptionUpdate) -> Void,
     onError: @escaping @MainActor @Sendable (String) -> Void
   ) async throws
   func stopLiveTranscription() async
@@ -41,16 +41,34 @@ struct LiveTranscriptionFinishResult: Equatable, Sendable {
   let coveredRequestedAudio: Bool
 }
 
+struct LiveTranscriptionUpdate: Equatable, Sendable {
+  let text: String
+  let audioEndTime: TimeInterval?
+}
+
+enum ProgressiveResultCoverage {
+  private static let audioTailTolerance: TimeInterval = 0.25
+
+  static func covers(audioEndTime: TimeInterval?, target: TimeInterval) -> Bool {
+    guard let audioEndTime, audioEndTime.isFinite, target.isFinite else { return false }
+    return audioEndTime + audioTailTolerance >= target
+  }
+}
+
 struct LiveTranscriptCheckpoint {
   private(set) var latestText = ""
+  private var latestAudioEndTime: TimeInterval?
   private var textBeforeLatestSeparatedBurst: String?
+  private var audioEndTimeBeforeLatestSeparatedBurst: TimeInterval?
 
-  mutating func update(_ text: String) {
+  mutating func update(_ text: String, audioEndTime: TimeInterval? = nil) {
     latestText = text
+    latestAudioEndTime = audioEndTime
   }
 
   mutating func beginSeparatedSpeechBurst() {
     textBeforeLatestSeparatedBurst = latestText
+    audioEndTimeBeforeLatestSeparatedBurst = latestAudioEndTime
   }
 
   func textForSubmission(excludingLatestSeparatedBurst: Bool) -> String {
@@ -58,6 +76,13 @@ struct LiveTranscriptCheckpoint {
       return textBeforeLatestSeparatedBurst
     }
     return latestText
+  }
+
+  func audioEndTimeForSubmission(excludingLatestSeparatedBurst: Bool) -> TimeInterval? {
+    if excludingLatestSeparatedBurst {
+      return audioEndTimeBeforeLatestSeparatedBurst
+    }
+    return latestAudioEndTime
   }
 }
 
@@ -93,7 +118,7 @@ final class PromptTranscriber {
 
   func startLiveTranscription(
     input: LiveAudioBufferSink,
-    onUpdate: @escaping @MainActor @Sendable (String) -> Void,
+    onUpdate: @escaping @MainActor @Sendable (LiveTranscriptionUpdate) -> Void,
     onError: @escaping @MainActor @Sendable (String) -> Void
   ) async throws {
     try await backend.startLiveTranscription(
@@ -110,16 +135,44 @@ final class PromptTranscriber {
   func transcribe(
     fileURL: URL,
     preferredLiveTranscript: String?,
+    preferredLiveTranscriptAudioEndTime: TimeInterval? = nil,
     liveTranscriptionRequest: LiveTranscriptionFinishRequest? = nil
   ) async throws -> String {
     if backend.liveTranscriptIsAuthoritative {
-      let completedLiveTranscript = try await backend.finishLiveTranscription(
-        liveTranscriptionRequest
+      let preferredText = preferredLiveTranscript?.trimmingCharacters(
+        in: .whitespacesAndNewlines
+      )
+      let preferredTranscriptCoversRequest: Bool
+      if let target = liveTranscriptionRequest?.waitThroughAudioTime {
+        preferredTranscriptCoversRequest =
+          preferredText?.isEmpty == false
+          && ProgressiveResultCoverage.covers(
+            audioEndTime: preferredLiveTranscriptAudioEndTime,
+            target: target
+          )
+      } else {
+        preferredTranscriptCoversRequest = preferredText?.isEmpty == false
+      }
+      let finishRequest: LiveTranscriptionFinishRequest
+      if preferredTranscriptCoversRequest {
+        finishRequest = LiveTranscriptionFinishRequest(
+          waitThroughAudioTime: nil,
+          includeAudioBeforeTime: liveTranscriptionRequest?.includeAudioBeforeTime
+        )
+      } else {
+        finishRequest =
+          liveTranscriptionRequest
           ?? LiveTranscriptionFinishRequest(
             waitThroughAudioTime: nil,
             includeAudioBeforeTime: nil
           )
+      }
+      let completedLiveTranscript = try await backend.finishLiveTranscription(
+        finishRequest
       )
+      if preferredTranscriptCoversRequest, let preferredText {
+        return preferredText
+      }
       if completedLiveTranscript.coveredRequestedAudio,
         let text = completedLiveTranscript.text
       {
@@ -175,7 +228,7 @@ actor ParakeetTranscriber: PromptTranscriberBackend {
 
   func startLiveTranscription(
     input: LiveAudioBufferSink,
-    onUpdate: @escaping @MainActor @Sendable (String) -> Void,
+    onUpdate: @escaping @MainActor @Sendable (LiveTranscriptionUpdate) -> Void,
     onError: @escaping @MainActor @Sendable (String) -> Void
   ) async throws {
     await stopLiveTranscription()
@@ -216,7 +269,7 @@ actor ParakeetTranscriber: PromptTranscriberBackend {
           )
           try Task.checkCancellation()
           guard generation == self.liveGeneration else { return }
-          await onUpdate(result.text)
+          await onUpdate(LiveTranscriptionUpdate(text: result.text, audioEndTime: nil))
         }
       } catch is CancellationError {
         return

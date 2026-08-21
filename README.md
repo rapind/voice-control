@@ -126,7 +126,9 @@ The menu-bar item shows the current state and active control phrases. Use **Open
 
 ## Application commands
 
-The wake phrase starts recording. Once recording, command aliases execute immediately from Apple Speech partials and do not require a submit phrase. `focus one` or `folk one` through eight, the scroll commands, and the media commands are the exception: they execute directly from idle without the wake phrase.
+The wake phrase starts recording. Once recording, command aliases execute immediately from Apple Speech partials and do not require a submit phrase. `focus one` or `folk one` through eight, the scroll commands, the context commands, and the media commands are the exception: they execute directly from idle without the wake phrase.
+
+`sleep MacBook` also executes directly from idle and immediately asks macOS to sleep. It does not require the wake phrase.
 
 Ghostty, ChatGPT, and Chrome support:
 
@@ -138,7 +140,7 @@ ChatGPT also supports `scroll end`, which jumps toward the latest generated outp
 
 `media launch` opens the installed YouTube Music web app, then restores focus to the application you were using. `media play`, `media pause`, `media next`, and `media previous` send macOS system media events without changing application focus. They control the current macOS media session, which works with YouTube Music once it owns that session. `media play` and `media pause` both send the system play/pause toggle because macOS does not expose separate play and pause media keys.
 
-For Ghostty, `new tab` creates and focuses a Herdr workspace through Herdr's API, while `close tab` closes the focused Herdr workspace. `clear context` sends `/clear`, and `compact context` sends `/compact`; both press Return. `quit session` sends Control-D to the foreground terminal process. `start session` types `omp` and presses Return. `share session` sends `/collab` and `stop sharing` sends `/collab stop`, each followed by Return. Numbered focus commands send Control+Option+1 through Control+Option+9, matching the configured Herdr workspace bindings. For ChatGPT, `new tab` sends Command-N, `close tab` sends Command-W, and `clear context` submits `/clear`. Chrome does not define new or close tab commands. Numbered focus commands in ChatGPT and Chrome send Command-1 through Command-9.
+For Ghostty, `new tab` creates and focuses a Herdr workspace through Herdr's API, while `close tab` closes the focused Herdr workspace. `clear context` sends `/clear`, and `compact context` sends `/compact`. Slash commands wait for the client to process the paste, then send Return twice so command completion cannot consume the only Return. `quit session` sends Control-D to the foreground terminal process. `start session` types `omp` and presses Return. `share session` sends `/collab` and `stop sharing` sends `/collab stop`. Numbered focus commands send Control+Option+1 through Control+Option+9, matching the configured Herdr workspace bindings. For ChatGPT, `new tab` sends Command-N, `close tab` sends Command-W, and `clear context` submits `/clear`. Chrome does not define new or close tab commands. Numbered focus commands in ChatGPT and Chrome send Command-1 through Command-9.
 
 `scroll up` and `scroll down` send mouse scroll wheel events to the center of the frontmost window, so they scroll whatever is on screen without moving the cursor or changing focus.
 

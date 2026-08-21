@@ -28,6 +28,10 @@ import Testing
   #expect(ApplicationCommand.nextSong.isDirectCommand)
   #expect(ApplicationCommand.previousSong.isDirectCommand)
   #expect(ApplicationCommand.launchMusic.isDirectCommand)
+  #expect(ApplicationCommand.sleepMacBook.isDirectCommand)
+  #expect(ApplicationCommand.sleepMacBook.isGlobalDirectCommand)
+  #expect(ApplicationCommand.clearContext.isDirectCommand)
+  #expect(ApplicationCommand.compactContext.isDirectCommand)
   #expect(!ApplicationCommand.newChat.isDirectCommand)
 }
 

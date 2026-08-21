@@ -11,6 +11,7 @@ struct CapturedApplication {
 final class ApplicationController {
   static let youtubeMusicBundleIdentifier =
     "com.google.Chrome.app.cinhimbnkkaeohfgghhklpknlkffjgod"
+  static let sleepScriptSource = "tell application \"System Events\" to sleep"
 
   private let logger = Logger(
     subsystem: "com.daverapin.voice-control-prototype",
@@ -188,7 +189,7 @@ final class ApplicationController {
     }
 
     if let text = textToSubmit(for: command, target: target) {
-      pasteAndSubmit(text, command: command, to: target, delay: 0, completion: completion)
+      pasteAndSubmit(text, to: target, delay: 0, completion: completion)
       return
     }
     guard let keyStroke = keyStroke(for: command, target: target) else {
@@ -213,6 +214,23 @@ final class ApplicationController {
     }
     guard postMediaKey(type: keyType) else {
       completion(.failure(InjectionError("Could not send the media command")))
+      return
+    }
+    completion(.success(()))
+  }
+
+  func sleepMacBook(completion: @escaping (Result<Void, Error>) -> Void) {
+    guard let script = NSAppleScript(source: Self.sleepScriptSource) else {
+      completion(.failure(InjectionError("Could not create the macOS sleep request")))
+      return
+    }
+    var errorInfo: NSDictionary?
+    _ = script.executeAndReturnError(&errorInfo)
+    if let errorInfo {
+      let message =
+        errorInfo[NSAppleScript.errorMessage] as? String
+        ?? "macOS rejected the sleep request"
+      completion(.failure(InjectionError(message)))
       return
     }
     completion(.success(()))
@@ -407,7 +425,7 @@ final class ApplicationController {
       return nil
     case .scrollUp, .scrollDown, .scrollEnd:
       return nil
-    case .launchMusic, .playMusic, .pauseMusic, .nextSong, .previousSong:
+    case .launchMusic, .playMusic, .pauseMusic, .nextSong, .previousSong, .sleepMacBook:
       return nil
     case .focusItem(let number):
       let keyCodes: [Int: CGKeyCode] = [
@@ -575,7 +593,6 @@ final class ApplicationController {
 
   private func pasteAndSubmit(
     _ text: String,
-    command: ApplicationCommand,
     to target: ApplicationTarget,
     delay: TimeInterval,
     completion: @escaping (Result<Void, Error>) -> Void
@@ -621,7 +638,7 @@ final class ApplicationController {
           }
         }
 
-        sendReturn(SubmissionTiming.returnCount(for: command))
+        sendReturn(SubmissionTiming.returnCount(for: text))
       }
     }
   }
@@ -731,11 +748,12 @@ enum HerdrWorkspaceControl {
 
 enum SubmissionTiming {
   static func returnDelay(for text: String) -> TimeInterval {
-    min(3, max(0.75, 0.5 + Double(text.utf16.count) / 200))
+    let calculatedDelay = min(3, max(0.75, 0.5 + Double(text.utf16.count) / 200))
+    return text.hasPrefix("/") ? max(1, calculatedDelay) : calculatedDelay
   }
 
-  static func returnCount(for command: ApplicationCommand) -> Int {
-    command == .stopSharing ? 2 : 1
+  static func returnCount(for text: String) -> Int {
+    text.hasPrefix("/") ? 2 : 1
   }
 }
 

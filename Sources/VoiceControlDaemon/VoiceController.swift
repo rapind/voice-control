@@ -294,6 +294,11 @@ final class VoiceController {
         command.isDirectCommand
       {
         captureSessionTarget()
+        if command.isGlobalDirectCommand {
+          print("Global direct command detected: \(command)")
+          dispatch(.commandDetected(command))
+          return
+        }
         if let sessionTarget,
           let targetCommand = ApplicationCommand.parse(
             transcript.text,
@@ -529,6 +534,12 @@ final class VoiceController {
   }
 
   private func execute(_ command: ApplicationCommand) {
+    if command == .sleepMacBook {
+      applicationController.sleepMacBook { [weak self] result in
+        self?.completeApplicationOperation(result)
+      }
+      return
+    }
     if command == .launchMusic {
       applicationController.launchYouTubeMusic { [weak self] result in
         self?.completeApplicationOperation(result)

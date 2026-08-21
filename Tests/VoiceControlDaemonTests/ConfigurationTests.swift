@@ -142,6 +142,24 @@ import Testing
   )
 }
 
+@Test func defaultsParseSleepMacBookFromEveryApplicationAndIdle() throws {
+  let configuration = try Configuration.decodeTOML(Data())
+
+  for target in ApplicationTarget.allCases.map(Optional.some) + [nil] {
+    let mappings = configuration.commandMappings(for: target)
+    #expect(
+      ApplicationCommand.parse(
+        "sleep MacBook", wakePhrases: configuration.wakePhrases, mappings: mappings)
+        == .sleepMacBook
+    )
+    #expect(
+      ApplicationCommand.parse(
+        "sleep Mac book", wakePhrases: configuration.wakePhrases, mappings: mappings)
+        == .sleepMacBook
+    )
+  }
+}
+
 @Test func commandsFollowFrontmostTargetInsteadOfConfiguredTarget() throws {
   let configuration = try Configuration.decodeTOML(
     Data(
@@ -531,6 +549,39 @@ import Testing
   )
 }
 
+@Test func contextCommandsParseDirectlyFromIdleForTheirSupportedApplication() throws {
+  let configuration = try Configuration.decodeTOML(Data())
+
+  #expect(
+    ApplicationCommand.parse(
+      "clear context",
+      wakePhrases: configuration.wakePhrases,
+      mappings: configuration.commandMappings(for: nil)
+    ) == .clearContext
+  )
+  #expect(
+    ApplicationCommand.parse(
+      "clear context",
+      wakePhrases: configuration.wakePhrases,
+      mappings: configuration.commandMappings(for: .chatGPT)
+    ) == .clearContext
+  )
+  #expect(
+    ApplicationCommand.parse(
+      "compact context",
+      wakePhrases: configuration.wakePhrases,
+      mappings: configuration.commandMappings(for: .ghostty)
+    ) == .compactContext
+  )
+  #expect(
+    ApplicationCommand.parse(
+      "compact context",
+      wakePhrases: configuration.wakePhrases,
+      mappings: configuration.commandMappings(for: .chatGPT)
+    ) == nil
+  )
+}
+
 @Test func cleansConfiguredWakeAndSubmitAliases() {
   #expect(
     PhraseMatcher.cleanFinalTranscript(
@@ -715,10 +766,18 @@ import Testing
   #expect(SubmissionTiming.returnDelay(for: String(repeating: "a", count: 50)) == 0.75)
   #expect(SubmissionTiming.returnDelay(for: String(repeating: "a", count: 300)) == 2.0)
   #expect(SubmissionTiming.returnDelay(for: String(repeating: "a", count: 1_000)) == 3.0)
+  #expect(SubmissionTiming.returnDelay(for: "/clear") == 1.0)
 }
 
 @Test func selectsAndExecutesOMPCollaborationStopCommand() {
-  #expect(SubmissionTiming.returnCount(for: .stopSharing) == 2)
+  #expect(SubmissionTiming.returnCount(for: "/collab stop") == 2)
+}
+
+@Test func slashCommandsUseTwoReturnsToAcceptAndExecuteTheCommand() {
+  #expect(SubmissionTiming.returnCount(for: "/clear") == 2)
+  #expect(SubmissionTiming.returnCount(for: "/compact") == 2)
+  #expect(SubmissionTiming.returnCount(for: "/collab") == 2)
+  #expect(SubmissionTiming.returnCount(for: "omp") == 1)
 }
 
 @Test func reloadsChangedFileAndKeepsLastGoodConfigurationAfterAnError() throws {

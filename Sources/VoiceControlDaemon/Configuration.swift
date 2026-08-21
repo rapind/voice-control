@@ -100,8 +100,6 @@ struct CommandPhrases: Equatable {
     [
       (.newChat, newChat),
       (.closeTab, closeTab),
-      (.clearContext, clearContext),
-      (.compactContext, compactContext),
       (.interruptSession, interruptSession),
       (.startSession, startSession),
       (.shareSession, shareSession),
@@ -111,6 +109,8 @@ struct CommandPhrases: Equatable {
 
   var directMappings: [(ApplicationCommand, [String])] {
     [
+      (.clearContext, clearContext),
+      (.compactContext, compactContext),
       (.scrollUp, scrollUp),
       (.scrollDown, scrollDown),
       (.scrollEnd, scrollEnd),
@@ -140,6 +140,9 @@ struct Configuration: Equatable {
     (.pauseMusic, ["media pause"]),
     (.nextSong, ["media next"]),
     (.previousSong, ["media previous"]),
+  ]
+  private static let systemMappings: [(ApplicationCommand, [String])] = [
+    (.sleepMacBook, ["sleep MacBook", "sleep Mac book"])
   ]
 
   var wakePhrases: [String]
@@ -453,9 +456,10 @@ struct Configuration: Equatable {
     guard let sessionTarget else {
       return globalFocusMappings
         + Self.musicMappings
+        + Self.systemMappings
         + ApplicationTarget.allCases.flatMap { applicationCommands[$0]!.directMappings }
     }
-    return globalFocusMappings + Self.musicMappings
+    return globalFocusMappings + Self.musicMappings + Self.systemMappings
       + applicationCommands[sessionTarget]!.nonFocusMappings
   }
 

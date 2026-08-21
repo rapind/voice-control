@@ -97,3 +97,10 @@ import Testing
       == "com.google.Chrome.app.cinhimbnkkaeohfgghhklpknlkffjgod"
   )
 }
+
+@Test func sleepMacBookUsesTheSystemSleepAppleEvent() {
+  #expect(
+    ApplicationController.sleepScriptSource
+      == "tell application \"System Events\" to sleep"
+  )
+}

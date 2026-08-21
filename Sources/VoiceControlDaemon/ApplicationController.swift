@@ -419,7 +419,9 @@ final class ApplicationController {
       }
     case .closeTab:
       return target == .chatGPT ? (13, .maskCommand) : nil
-    case .clearContext, .compactContext:
+    case .clearContext:
+      return target == .chatGPT ? (45, .maskCommand) : nil
+    case .compactContext:
       return nil
     case .interruptSession, .startSession, .shareSession, .stopSharing:
       return nil
@@ -511,7 +513,7 @@ final class ApplicationController {
   ) -> String? {
     switch command {
     case .clearContext:
-      return target == .ghostty || target == .chatGPT ? "/clear" : nil
+      return target == .ghostty ? "/clear" : nil
     case .compactContext: return target == .ghostty ? "/compact" : nil
     case .shareSession: return target == .ghostty ? "/collab" : nil
     case .stopSharing: return target == .ghostty ? "/collab stop" : nil

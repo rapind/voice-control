@@ -36,12 +36,15 @@ import Testing
   let controller = ApplicationController()
   let newTab = try #require(controller.keyStroke(for: .newChat, target: .chatGPT))
   let closeTab = try #require(controller.keyStroke(for: .closeTab, target: .chatGPT))
+  let clearContext = try #require(
+    controller.keyStroke(for: .clearContext, target: .chatGPT))
 
   #expect(newTab.keyCode == 45)
   #expect(newTab.flags == .maskCommand)
   #expect(closeTab.keyCode == 13)
   #expect(closeTab.flags == .maskCommand)
-  #expect(controller.slashCommandText(for: .clearContext, target: .chatGPT) == "/clear")
+  #expect(clearContext == newTab)
+  #expect(controller.slashCommandText(for: .clearContext, target: .chatGPT) == nil)
   #expect(controller.slashCommandText(for: .compactContext, target: .chatGPT) == nil)
   #expect(controller.keyStroke(for: .closeTab, target: .ghostty) == nil)
 }

@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 
 @testable import VoiceControlDaemon
@@ -66,4 +67,50 @@ import Testing
       audioIsRunning: false,
       isReceivingAudio: false,
       restartIsScheduled: true))
+}
+
+@Test func explicitOnlyRecordingNeverProducesAnAutomaticSubmissionTrigger() {
+  let now = Date(timeIntervalSinceReferenceDate: 200)
+
+  #expect(
+    AutomaticSubmission.trigger(
+      enabled: false,
+      now: now,
+      recordingStartedAt: now.addingTimeInterval(-120),
+      lastSpeechAt: now.addingTimeInterval(-10),
+      ignoreSilenceUntil: now.addingTimeInterval(-119),
+      heardPromptSpeech: true,
+      silenceSeconds: 5,
+      maximumRecordingSeconds: 90
+    ) == nil
+  )
+}
+
+@Test func enabledAutomaticSubmissionDetectsDurationAndSilenceDeadlines() {
+  let now = Date(timeIntervalSinceReferenceDate: 200)
+
+  #expect(
+    AutomaticSubmission.trigger(
+      enabled: true,
+      now: now,
+      recordingStartedAt: now.addingTimeInterval(-120),
+      lastSpeechAt: now,
+      ignoreSilenceUntil: now.addingTimeInterval(-119),
+      heardPromptSpeech: true,
+      silenceSeconds: 5,
+      maximumRecordingSeconds: 90
+    ) == .maximumDuration
+  )
+  #expect(
+    AutomaticSubmission.trigger(
+      enabled: true,
+      now: now,
+      recordingStartedAt: now.addingTimeInterval(-20),
+      lastSpeechAt: now.addingTimeInterval(-10),
+      ignoreSilenceUntil: now.addingTimeInterval(-19),
+      heardPromptSpeech: true,
+      silenceSeconds: 5,
+      maximumRecordingSeconds: 90
+    ) == .silence
+  )
 }

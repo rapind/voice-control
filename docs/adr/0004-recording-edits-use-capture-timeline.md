@@ -14,6 +14,8 @@ Instead, audio-level samples identify speech bursts on the capture timeline. Whe
 
 Apple progressive transcription treats the latest live preview as the authoritative prompt. When a new speech burst begins after a distinct period of silence, the daemon checkpoints the preview before that burst. If the burst is recognized as the submit phrase, the checkpoint is submitted, so a misrecognition such as `Sunday` does not leak into the prompt. Silence submission uses the latest live revision. Apple finalization and file retranscription are skipped unless live recognition produced no usable text.
 
+Automatic submission is configurable and enabled by default. Six seconds of silence submits the current prompt, and a six-minute maximum duration prevents an abandoned recording from running forever. A configured submit phrase sends immediately. When `automatic_submit = false`, neither silence nor maximum recording duration submits a prompt.
+
 The Parakeet fallback continues to transcribe the finished file because its rolling live preview is intended as feedback rather than its authoritative full-context result. An empty cut is rejected before any fallback file transcription.
 
 ## Consequences

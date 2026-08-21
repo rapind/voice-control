@@ -96,3 +96,28 @@ struct VoiceStateMachine {
     }
   }
 }
+
+enum AutomaticSubmissionTrigger: Equatable {
+  case silence
+  case maximumDuration
+}
+
+enum AutomaticSubmission {
+  static func trigger(
+    enabled: Bool,
+    now: Date,
+    recordingStartedAt: Date,
+    lastSpeechAt: Date,
+    ignoreSilenceUntil: Date,
+    heardPromptSpeech: Bool,
+    silenceSeconds: TimeInterval,
+    maximumRecordingSeconds: TimeInterval
+  ) -> AutomaticSubmissionTrigger? {
+    guard enabled else { return nil }
+    if now.timeIntervalSince(recordingStartedAt) >= maximumRecordingSeconds {
+      return .maximumDuration
+    }
+    guard heardPromptSpeech, now >= ignoreSilenceUntil else { return nil }
+    return now.timeIntervalSince(lastSpeechAt) >= silenceSeconds ? .silence : nil
+  }
+}

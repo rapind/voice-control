@@ -149,6 +149,7 @@ struct Configuration: Equatable {
   var submitPhrases: [String]
   var cancelPhrases: [String]
   var vocabulary: [String]
+  var automaticSubmitEnabled: Bool
   var silenceSeconds: TimeInterval
   var silenceThresholdDB: Float
   var maximumRecordingSeconds: TimeInterval
@@ -160,9 +161,10 @@ struct Configuration: Equatable {
     submitPhrases: ["ghost it"],
     cancelPhrases: ["ghost cancel"],
     vocabulary: [],
-    silenceSeconds: 5,
+    automaticSubmitEnabled: true,
+    silenceSeconds: 6,
     silenceThresholdDB: -45,
-    maximumRecordingSeconds: 90,
+    maximumRecordingSeconds: 360,
     voiceProcessingEnabled: false,
     applicationCommands: [
       .ghostty: .ghosttyDefaults,
@@ -178,9 +180,10 @@ struct Configuration: Equatable {
     cancel = ["ghost cancel"]
     vocabulary = []
 
-    silence_seconds = 5
+    automatic_submit = true
+    silence_seconds = 6
     silence_threshold_db = -45
-    maximum_recording_seconds = 90
+    maximum_recording_seconds = 360
     voice_processing = false
 
     [applications.ghostty.commands]
@@ -270,6 +273,8 @@ struct Configuration: Equatable {
       submitPhrases: raw.submit ?? defaults.submitPhrases,
       cancelPhrases: raw.cancel ?? defaults.cancelPhrases,
       vocabulary: raw.vocabulary ?? defaults.vocabulary,
+      automaticSubmitEnabled: raw.automaticSubmitEnabled
+        ?? defaults.automaticSubmitEnabled,
       silenceSeconds: raw.silenceSeconds ?? defaults.silenceSeconds,
       silenceThresholdDB: Float(raw.silenceThresholdDB ?? Double(defaults.silenceThresholdDB)),
       maximumRecordingSeconds: raw.maximumRecordingSeconds
@@ -488,6 +493,7 @@ private struct RawConfiguration: Decodable {
   var submit: [String]?
   var cancel: [String]?
   var vocabulary: [String]?
+  var automaticSubmitEnabled: Bool?
   var silenceSeconds: Double?
   var silenceThresholdDB: Double?
   var maximumRecordingSeconds: Double?
@@ -497,6 +503,7 @@ private struct RawConfiguration: Decodable {
 
   enum CodingKeys: String, CodingKey {
     case target, wake, submit, cancel, vocabulary, applications, commands
+    case automaticSubmitEnabled = "automatic_submit"
     case silenceSeconds = "silence_seconds"
     case silenceThresholdDB = "silence_threshold_db"
     case maximumRecordingSeconds = "maximum_recording_seconds"

@@ -78,6 +78,29 @@ import Testing
   #expect(await backend.transcribedURLs.isEmpty)
 }
 
+@Test func authoritativeLiveTranscriptFallsBackToFileWhenProgressiveDrainTimesOut() async throws {
+  let backend = PromptTranscriberBackendSpy(
+    liveTranscriptIsAuthoritative: true,
+    completedLiveTranscript: "the incomplete progressive result",
+    completedLiveTranscriptCoveredRequestedAudio: false
+  )
+  let transcriber = PromptTranscriber(backend: backend)
+  let fileURL = URL(fileURLWithPath: "/tmp/complete-prompt.wav")
+
+  let result = try await transcriber.transcribe(
+    fileURL: fileURL,
+    preferredLiveTranscript: "an older incomplete preview",
+    liveTranscriptionRequest: LiveTranscriptionFinishRequest(
+      waitThroughAudioTime: 12.4,
+      includeAudioBeforeTime: nil
+    )
+  )
+
+  #expect(result == "transcript")
+  #expect(await backend.finishedLiveTranscriptCutoffs == [12.4])
+  #expect(await backend.transcribedURLs == [fileURL])
+}
+
 @Test func nonAuthoritativeBackendKeepsItsFinalFileTranscription() async throws {
   let backend = PromptTranscriberBackendSpy()
   let transcriber = PromptTranscriber(backend: backend)
@@ -100,13 +123,17 @@ private actor PromptTranscriberBackendSpy: PromptTranscriberBackend {
   private(set) var finishedLiveTranscriptCutoffs: [TimeInterval?] = []
   private(set) var transcribedURLs: [URL] = []
   private let completedLiveTranscript: String?
+  private let completedLiveTranscriptCoveredRequestedAudio: Bool
 
   init(
     liveTranscriptIsAuthoritative: Bool = false,
-    completedLiveTranscript: String? = nil
+    completedLiveTranscript: String? = nil,
+    completedLiveTranscriptCoveredRequestedAudio: Bool = true
   ) {
     self.liveTranscriptIsAuthoritative = liveTranscriptIsAuthoritative
     self.completedLiveTranscript = completedLiveTranscript
+    self.completedLiveTranscriptCoveredRequestedAudio =
+      completedLiveTranscriptCoveredRequestedAudio
   }
 
   func prepare() async throws {}
@@ -121,10 +148,15 @@ private actor PromptTranscriberBackendSpy: PromptTranscriberBackend {
     stopCount += 1
   }
 
-  func finishLiveTranscription(_ request: LiveTranscriptionFinishRequest) async throws -> String? {
+  func finishLiveTranscription(
+    _ request: LiveTranscriptionFinishRequest
+  ) async throws -> LiveTranscriptionFinishResult {
     finishedLiveTranscriptCutoffs.append(request.waitThroughAudioTime)
     stopCount += 1
-    return completedLiveTranscript
+    return LiveTranscriptionFinishResult(
+      text: completedLiveTranscript,
+      coveredRequestedAudio: completedLiveTranscriptCoveredRequestedAudio
+    )
   }
 
   func transcribe(fileURL: URL) async throws -> String {

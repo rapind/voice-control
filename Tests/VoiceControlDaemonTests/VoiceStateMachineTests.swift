@@ -69,6 +69,12 @@ import Testing
       restartIsScheduled: true))
 }
 
+@Test func promptCaptureWaitsForTheWakeConfirmationSoundToFinish() {
+  #expect(WakeConfirmation.captureDelay(soundDuration: nil) == 0)
+  #expect(WakeConfirmation.captureDelay(soundDuration: 0) == 0)
+  #expect(abs(WakeConfirmation.captureDelay(soundDuration: 0.564) - 0.614) < 0.000_001)
+}
+
 @Test func explicitOnlyRecordingNeverProducesAnAutomaticSubmissionTrigger() {
   let now = Date(timeIntervalSinceReferenceDate: 200)
 

@@ -145,7 +145,8 @@ enum PhraseMatcher {
   static func cleanFinalTranscript(
     _ text: String,
     wakePhrases: [String],
-    submitPhrases: [String]
+    submitPhrases: [String],
+    explicitSubmitDetected: Bool = false
   )
     -> String
   {
@@ -155,6 +156,18 @@ enum PhraseMatcher {
     }
     for phrase in submitPhrases.sorted(by: { $0.count > $1.count }) {
       cleaned = strip(phrase: phrase, fromEndOf: cleaned)
+    }
+    if explicitSubmitDetected {
+      for phrase in submitPhrases {
+        let words = phrase.split(whereSeparator: { $0.isWhitespace }).map(String.init)
+        guard words.count > 1 else { continue }
+        for prefixLength in stride(from: words.count - 1, through: 1, by: -1) {
+          cleaned = strip(
+            phrase: words.prefix(prefixLength).joined(separator: " "),
+            fromEndOf: cleaned
+          )
+        }
+      }
     }
     return cleaned.trimmingCharacters(in: .whitespacesAndNewlines)
   }

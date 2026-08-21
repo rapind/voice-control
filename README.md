@@ -111,7 +111,7 @@ Save the file and the app applies valid changes within about one second. You do 
 
 `vocabulary` lists words and short phrases to bias Apple Speech toward during dictation. It is a recognition hint, not a replacement rule, so adding `bean` does not turn legitimate uses of `being` into `bean`.
 
-The wake phrase starts recording without changing focus. Dictation is bound to whichever window was frontmost when recording started. Application-focus phrases, `focus ghost tee`, `focus chat`, and `focus chrome`, execute after a wake phrase.
+The wake phrase plays its confirmation sound, then starts recording without changing focus. Dictation is bound to whichever window was frontmost when the wake phrase was recognized. Application-focus phrases, `focus ghost tee`, `focus chat`, and `focus chrome`, execute after a wake phrase.
 
 `focus one` or `folk one` through eight, the scroll commands, and the media commands execute directly from idle. In Ghostty, numbered focus commands send Control+Option+1 through Control+Option+8, and in ChatGPT or Chrome they send Command+1 through Command+8. `scroll up` and `scroll down` send mouse wheel events to the frontmost window. If another application was frontmost, the phrase is consumed without sending a keyboard shortcut.
 

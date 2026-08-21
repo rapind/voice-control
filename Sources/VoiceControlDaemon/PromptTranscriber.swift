@@ -13,7 +13,9 @@ protocol PromptTranscriberBackend: Sendable {
     onError: @escaping @MainActor @Sendable (String) -> Void
   ) async throws
   func stopLiveTranscription() async
-  func finishLiveTranscription(_ request: LiveTranscriptionFinishRequest) async throws -> String?
+  func finishLiveTranscription(
+    _ request: LiveTranscriptionFinishRequest
+  ) async throws -> LiveTranscriptionFinishResult
   func transcribe(fileURL: URL) async throws -> String
   func updateContextualStrings(_ contextualStrings: [String]) async
 }
@@ -21,15 +23,22 @@ protocol PromptTranscriberBackend: Sendable {
 extension PromptTranscriberBackend {
   var liveTranscriptIsAuthoritative: Bool { false }
 
-  func finishLiveTranscription(_ request: LiveTranscriptionFinishRequest) async throws -> String? {
+  func finishLiveTranscription(
+    _ request: LiveTranscriptionFinishRequest
+  ) async throws -> LiveTranscriptionFinishResult {
     await stopLiveTranscription()
-    return nil
+    return LiveTranscriptionFinishResult(text: nil, coveredRequestedAudio: false)
   }
 }
 
 struct LiveTranscriptionFinishRequest: Equatable, Sendable {
   let waitThroughAudioTime: TimeInterval?
   let includeAudioBeforeTime: TimeInterval?
+}
+
+struct LiveTranscriptionFinishResult: Equatable, Sendable {
+  let text: String?
+  let coveredRequestedAudio: Bool
 }
 
 struct LiveTranscriptCheckpoint {
@@ -111,15 +120,17 @@ final class PromptTranscriber {
             includeAudioBeforeTime: nil
           )
       )
-      if let completedLiveTranscript {
-        let liveTranscript = completedLiveTranscript.trimmingCharacters(
+      if completedLiveTranscript.coveredRequestedAudio,
+        let text = completedLiveTranscript.text
+      {
+        let liveTranscript = text.trimmingCharacters(
           in: .whitespacesAndNewlines
         )
         if !liveTranscript.isEmpty {
           return liveTranscript
         }
       }
-      if let preferredLiveTranscript {
+      if completedLiveTranscript.coveredRequestedAudio, let preferredLiveTranscript {
         let liveTranscript = preferredLiveTranscript.trimmingCharacters(
           in: .whitespacesAndNewlines
         )

@@ -102,6 +102,15 @@ enum AutomaticSubmissionTrigger: Equatable {
   case maximumDuration
 }
 
+enum WakeConfirmation {
+  private static let completionMargin: TimeInterval = 0.05
+
+  static func captureDelay(soundDuration: TimeInterval?) -> TimeInterval {
+    guard let soundDuration, soundDuration.isFinite, soundDuration > 0 else { return 0 }
+    return min(soundDuration + completionMargin, 1)
+  }
+}
+
 enum AutomaticSubmission {
   static func trigger(
     enabled: Bool,

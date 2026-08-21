@@ -6,7 +6,7 @@ Accepted
 
 ## Decision
 
-The daemon keeps microphone capture and keyword recognition active while it is waiting for a wake phrase. A wake phrase starts a prompt recording, while the capture stream remains the source for both keyword recognition and live transcription.
+The daemon keeps microphone capture and keyword recognition active while it is waiting for a wake phrase. A wake phrase plays the confirmation sound, then starts prompt recording after the sound has finished. This prevents the microphone from feeding the daemon's own confirmation sound into prompt transcription. The capture stream remains the source for both keyword recognition and live transcription.
 
 Audio capture uses the microphone's raw mono signal by default because Apple's call-oriented voice processing weakens far-field dictation. Voice processing remains available as an explicit configuration option, and its multichannel device output is normalized to mono before wake recognition, prompt transcription, recording, and level measurement. While waiting for a wake phrase, the daemon measures the ambient noise floor. After calibration, prompt speech is detected at 8 dB above that floor; the configured fixed threshold is used during startup.
 

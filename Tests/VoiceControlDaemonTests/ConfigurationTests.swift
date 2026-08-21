@@ -612,6 +612,25 @@ import Testing
   )
 }
 
+@Test func explicitSubmissionRemovesAPartiallyTranscribedSubmitPhrase() {
+  #expect(
+    PhraseMatcher.cleanFinalTranscript(
+      "Agreed. Send",
+      wakePhrases: ["computer"],
+      submitPhrases: ["send it", "sent it"],
+      explicitSubmitDetected: true
+    ) == "Agreed."
+  )
+  #expect(
+    PhraseMatcher.cleanFinalTranscript(
+      "Agreed. Send",
+      wakePhrases: ["computer"],
+      submitPhrases: ["send it", "sent it"],
+      explicitSubmitDetected: false
+    ) == "Agreed. Send"
+  )
+}
+
 @Test func matchesConfiguredControlPhraseNearTranscriptTail() {
   let transcript = KeywordTranscript(
     text: "write this send it accidental trailing",

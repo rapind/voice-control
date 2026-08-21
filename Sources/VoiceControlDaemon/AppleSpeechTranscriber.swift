@@ -187,18 +187,21 @@ actor AppleSpeechTranscriber: PromptTranscriberBackend {
 
   func finishLiveTranscription(
     _ request: LiveTranscriptionFinishRequest
-  ) async throws -> String? {
+  ) async throws -> LiveTranscriptionFinishResult {
     liveInput?.finish()
     await feederTask?.value
     feederTask = nil
     inputBuilder?.finish()
     inputBuilder = nil
 
+    let covered: Bool
     if let target = request.waitThroughAudioTime {
-      let covered = await waitForProgressiveResult(through: target)
+      covered = await waitForProgressiveResult(through: target)
       logger.notice(
         "Progressive drain target=\(target, privacy: .public)s result-end=\(self.latestResultAudioEnd ?? -1, privacy: .public)s covered=\(covered, privacy: .public)"
       )
+    } else {
+      covered = true
     }
 
     let text = progressiveText(before: request.includeAudioBeforeTime)
@@ -208,7 +211,10 @@ actor AppleSpeechTranscriber: PromptTranscriberBackend {
     await resultTask?.value
     clearSession()
     if let error { throw error }
-    return text
+    return LiveTranscriptionFinishResult(
+      text: text,
+      coveredRequestedAudio: covered
+    )
   }
 
   func transcribe(fileURL: URL) async throws -> String {
@@ -290,7 +296,7 @@ actor AppleSpeechTranscriber: PromptTranscriberBackend {
       progressiveResultWaiter = continuation
       progressiveResultTimeoutTask?.cancel()
       progressiveResultTimeoutTask = Task { [weak self] in
-        try? await Task.sleep(for: .milliseconds(900))
+        try? await Task.sleep(for: .seconds(1))
         guard !Task.isCancelled else { return }
         await self?.resumeProgressiveResultWaiter(covered: false)
       }

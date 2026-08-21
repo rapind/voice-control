@@ -163,3 +163,35 @@ import Testing
   #expect(tracker.latestSeparatedBurstStartAudioTime == nil)
   #expect(tracker.latestSpeechEndAudioTime == 102)
 }
+
+@Test func submitCutoffRejectsAStaleBurstFromTheFinalSentence() {
+  let match = ControlPhraseMatch(
+    phrase: "send it",
+    startTime: 112.4,
+    endTime: 113,
+    transcriptEndTime: 113
+  )
+
+  #expect(
+    SubmitPhraseCutoff.audioTime(
+      for: match,
+      latestSeparatedBurstStartAudioTime: 106.2
+    ) == nil
+  )
+}
+
+@Test func submitCutoffStartsInsideTheSilenceBeforeAnAlignedSubmitPhrase() {
+  let match = ControlPhraseMatch(
+    phrase: "send it",
+    startTime: 112.4,
+    endTime: 113,
+    transcriptEndTime: 113
+  )
+
+  #expect(
+    SubmitPhraseCutoff.audioTime(
+      for: match,
+      latestSeparatedBurstStartAudioTime: 112.1
+    ) == 111.85
+  )
+}

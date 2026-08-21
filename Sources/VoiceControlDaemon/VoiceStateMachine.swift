@@ -25,7 +25,6 @@ enum VoiceEvent {
   case wakeDetected
   case submitDetected
   case cancelDetected
-  case silenceExpired
   case maximumDurationExpired
   case commandDetected(ApplicationCommand)
   case transcriptionSucceeded(String)
@@ -62,7 +61,6 @@ struct VoiceStateMachine {
       return [.executeCommand(command)]
 
     case (.recording, .submitDetected),
-      (.recording, .silenceExpired),
       (.recording, .maximumDurationExpired):
       phase = .transcribing
       return [.stopAndTranscribe]
@@ -97,11 +95,6 @@ struct VoiceStateMachine {
   }
 }
 
-enum AutomaticSubmissionTrigger: Equatable {
-  case silence
-  case maximumDuration
-}
-
 enum WakeConfirmation {
   private static let completionMargin: TimeInterval = 0.05
 
@@ -111,22 +104,12 @@ enum WakeConfirmation {
   }
 }
 
-enum AutomaticSubmission {
-  static func trigger(
-    enabled: Bool,
+enum MaximumRecordingDuration {
+  static func hasExpired(
     now: Date,
     recordingStartedAt: Date,
-    lastSpeechAt: Date,
-    ignoreSilenceUntil: Date,
-    heardPromptSpeech: Bool,
-    silenceSeconds: TimeInterval,
     maximumRecordingSeconds: TimeInterval
-  ) -> AutomaticSubmissionTrigger? {
-    guard enabled else { return nil }
-    if now.timeIntervalSince(recordingStartedAt) >= maximumRecordingSeconds {
-      return .maximumDuration
-    }
-    guard heardPromptSpeech, now >= ignoreSilenceUntil else { return nil }
-    return now.timeIntervalSince(lastSpeechAt) >= silenceSeconds ? .silence : nil
+  ) -> Bool {
+    now.timeIntervalSince(recordingStartedAt) >= maximumRecordingSeconds
   }
 }

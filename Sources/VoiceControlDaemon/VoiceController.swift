@@ -22,14 +22,11 @@ final class VoiceController {
   private var voiceReady = false
   private var targetPID: pid_t?
   private var sessionTarget: ApplicationTarget?
-  private var lastSpeechAt = Date()
   private var recordingStartedAt = Date()
   private var submitCutoffAudioTime: TimeInterval?
   private var explicitSubmitDetected = false
   private var recordingStartAudioTime: TimeInterval?
-  private var ignoreSilenceUntil = Date()
-  private var heardPromptSpeech = false
-  private var automaticSubmissionTimer: Timer?
+  private var recordingLimitTimer: Timer?
   private var audioHealthTimer: Timer?
   private var audioRestartWorkItem: DispatchWorkItem?
   private var promptCaptureStartWorkItem: DispatchWorkItem?
@@ -90,8 +87,8 @@ final class VoiceController {
   }
 
   func stop() {
-    automaticSubmissionTimer?.invalidate()
-    automaticSubmissionTimer = nil
+    recordingLimitTimer?.invalidate()
+    recordingLimitTimer = nil
     keywords.stop()
     audioHealthTimer?.invalidate()
     audioHealthTimer = nil
@@ -179,7 +176,6 @@ final class VoiceController {
       submitCutoffAudioTime = nil
       explicitSubmitDetected = false
       speechBurstTracker.reset()
-      heardPromptSpeech = false
       preview = TranscriptPreview()
       liveTranscript = LiveTranscriptCheckpoint()
       previewReady = targetPID != nil
@@ -192,8 +188,8 @@ final class VoiceController {
       schedulePromptCapture(after: captureDelay)
 
     case .stopAndTranscribe:
-      automaticSubmissionTimer?.invalidate()
-      automaticSubmissionTimer = nil
+      recordingLimitTimer?.invalidate()
+      recordingLimitTimer = nil
       keywords.stop()
       NSSound(named: "Pop")?.play()
       liveAudioRouter.finish()
@@ -235,8 +231,8 @@ final class VoiceController {
       )
 
     case .cancelPromptRecording:
-      automaticSubmissionTimer?.invalidate()
-      automaticSubmissionTimer = nil
+      recordingLimitTimer?.invalidate()
+      recordingLimitTimer = nil
       keywords.stop()
       stopLiveTranscription()
       discardPromptRecording()
@@ -268,8 +264,8 @@ final class VoiceController {
       }
 
     case .executeCommand(let command):
-      automaticSubmissionTimer?.invalidate()
-      automaticSubmissionTimer = nil
+      recordingLimitTimer?.invalidate()
+      recordingLimitTimer = nil
       keywords.stop()
       stopLiveTranscription()
       discardPromptRecording()
@@ -397,8 +393,6 @@ final class VoiceController {
   private func startPromptCapture() {
     let now = Date()
     recordingStartedAt = now
-    ignoreSilenceUntil = now.addingTimeInterval(0.6)
-    lastSpeechAt = ignoreSilenceUntil
     lastKeywordTranscript = ""
     let liveInput = LiveAudioBufferSink()
     liveAudioRouter.route(to: liveInput)
@@ -406,7 +400,7 @@ final class VoiceController {
     do {
       recordingStartAudioTime = try audio.beginRecording()
       promptCaptureStarted = true
-      startAutomaticSubmissionTimer()
+      startRecordingLimitTimer()
       applyPendingPreview()
     } catch {
       fail("Could not begin recording: \(error.localizedDescription)")
@@ -446,7 +440,6 @@ final class VoiceController {
       }
     case .recording:
       guard promptCaptureStarted else { return }
-      guard Date() >= ignoreSilenceUntil else { return }
       let thresholdDB = ambientNoiseFloor.speechThreshold(
         fallback: configuration.silenceThresholdDB
       )
@@ -457,9 +450,6 @@ final class VoiceController {
       {
         liveTranscript.beginSeparatedSpeechBurst()
       }
-      guard sample.levelDB >= thresholdDB else { return }
-      heardPromptSpeech = true
-      lastSpeechAt = Date()
     default:
       break
     }
@@ -500,12 +490,8 @@ final class VoiceController {
     return result
   }
 
-  private func startAutomaticSubmissionTimer() {
-    automaticSubmissionTimer?.invalidate()
-    guard configuration.automaticSubmitEnabled else {
-      automaticSubmissionTimer = nil
-      return
-    }
+  private func startRecordingLimitTimer() {
+    recordingLimitTimer?.invalidate()
     let timer = Timer(timeInterval: 0.2, repeats: true) { [weak self] timer in
       guard let self else {
         timer.invalidate()
@@ -515,27 +501,16 @@ final class VoiceController {
         timer.invalidate()
         return
       }
-      switch AutomaticSubmission.trigger(
-        enabled: self.configuration.automaticSubmitEnabled,
+      if MaximumRecordingDuration.hasExpired(
         now: Date(),
         recordingStartedAt: self.recordingStartedAt,
-        lastSpeechAt: self.lastSpeechAt,
-        ignoreSilenceUntil: self.ignoreSilenceUntil,
-        heardPromptSpeech: self.heardPromptSpeech,
-        silenceSeconds: self.configuration.silenceSeconds,
         maximumRecordingSeconds: self.configuration.maximumRecordingSeconds
       ) {
-      case .maximumDuration:
         self.dispatch(.maximumDurationExpired)
-      case .silence:
-        print("Silence fallback reached")
-        self.dispatch(.silenceExpired)
-      case nil:
-        break
       }
     }
     RunLoop.main.add(timer, forMode: .common)
-    automaticSubmissionTimer = timer
+    recordingLimitTimer = timer
   }
 
   private func makeLiveTranscriptionFinishRequest(
@@ -764,8 +739,8 @@ final class VoiceController {
   }
 
   private func fail(_ message: String, recover: Bool = true) {
-    automaticSubmissionTimer?.invalidate()
-    automaticSubmissionTimer = nil
+    recordingLimitTimer?.invalidate()
+    recordingLimitTimer = nil
     keywords.stop()
     audioHealthTimer?.invalidate()
     audioHealthTimer = nil
@@ -792,13 +767,7 @@ final class VoiceController {
     print("  wake phrases: \(configuration.wakePhrases.joined(separator: ", "))")
     print("  submit phrases: \(configuration.submitPhrases.joined(separator: ", "))")
     print("  cancel phrases: \(configuration.cancelPhrases.joined(separator: ", "))")
-    if configuration.automaticSubmitEnabled {
-      print(
-        "  automatic submission: enabled after \(configuration.silenceSeconds)s silence or \(configuration.maximumRecordingSeconds)s total"
-      )
-    } else {
-      print("  automatic submission: disabled")
-    }
+    print("  maximum recording duration: \(configuration.maximumRecordingSeconds)s")
     print(
       "  Apple voice processing: \(configuration.voiceProcessingEnabled ? "enabled" : "disabled")")
     print("  transcription: \(transcriber.name)")

@@ -149,8 +149,6 @@ struct Configuration: Equatable {
   var submitPhrases: [String]
   var cancelPhrases: [String]
   var vocabulary: [String]
-  var automaticSubmitEnabled: Bool
-  var silenceSeconds: TimeInterval
   var silenceThresholdDB: Float
   var maximumRecordingSeconds: TimeInterval
   var voiceProcessingEnabled: Bool
@@ -161,8 +159,6 @@ struct Configuration: Equatable {
     submitPhrases: ["ghost it"],
     cancelPhrases: ["ghost cancel"],
     vocabulary: [],
-    automaticSubmitEnabled: true,
-    silenceSeconds: 6,
     silenceThresholdDB: -45,
     maximumRecordingSeconds: 360,
     voiceProcessingEnabled: false,
@@ -180,8 +176,6 @@ struct Configuration: Equatable {
     cancel = ["ghost cancel"]
     vocabulary = []
 
-    automatic_submit = true
-    silence_seconds = 6
     silence_threshold_db = -45
     maximum_recording_seconds = 360
     voice_processing = false
@@ -273,9 +267,6 @@ struct Configuration: Equatable {
       submitPhrases: raw.submit ?? defaults.submitPhrases,
       cancelPhrases: raw.cancel ?? defaults.cancelPhrases,
       vocabulary: raw.vocabulary ?? defaults.vocabulary,
-      automaticSubmitEnabled: raw.automaticSubmitEnabled
-        ?? defaults.automaticSubmitEnabled,
-      silenceSeconds: raw.silenceSeconds ?? defaults.silenceSeconds,
       silenceThresholdDB: Float(raw.silenceThresholdDB ?? Double(defaults.silenceThresholdDB)),
       maximumRecordingSeconds: raw.maximumRecordingSeconds
         ?? defaults.maximumRecordingSeconds,
@@ -419,9 +410,6 @@ struct Configuration: Equatable {
       }
     }
 
-    guard silenceSeconds >= 1 else {
-      throw ConfigurationError("silence_seconds must be at least 1")
-    }
     guard (-100...0).contains(silenceThresholdDB) else {
       throw ConfigurationError("silence_threshold_db must be between -100 and 0")
     }
@@ -493,8 +481,6 @@ private struct RawConfiguration: Decodable {
   var submit: [String]?
   var cancel: [String]?
   var vocabulary: [String]?
-  var automaticSubmitEnabled: Bool?
-  var silenceSeconds: Double?
   var silenceThresholdDB: Double?
   var maximumRecordingSeconds: Double?
   var voiceProcessingEnabled: Bool?
@@ -503,8 +489,6 @@ private struct RawConfiguration: Decodable {
 
   enum CodingKeys: String, CodingKey {
     case target, wake, submit, cancel, vocabulary, applications, commands
-    case automaticSubmitEnabled = "automatic_submit"
-    case silenceSeconds = "silence_seconds"
     case silenceThresholdDB = "silence_threshold_db"
     case maximumRecordingSeconds = "maximum_recording_seconds"
     case voiceProcessingEnabled = "voice_processing"

@@ -52,8 +52,6 @@ submit = ["send it", "sent it"]
 cancel = ["cancel it"]
 vocabulary = ["bean"]
 
-automatic_submit = true
-silence_seconds = 6
 silence_threshold_db = -45
 maximum_recording_seconds = 360
 voice_processing = false
@@ -147,7 +145,7 @@ For Ghostty, `new tab` creates and focuses a Herdr workspace through Herdr's API
 
 All other speech remains a normal prompt. On macOS 26, Apple progressive results revise the visible text while recording, and the last useful live revision is authoritative. Voice Control does not ask Apple to rewrite it during a final pass. On macOS 14 and 15, rolling full-context Parakeet passes provide the preview and a final file pass remains authoritative.
 
-Automatic submission is enabled with `automatic_submit = true`. Six seconds of silence submits the current prompt, and the six-minute recording limit prevents an abandoned recording from running forever. A configured submit phrase still sends immediately. Set `automatic_submit = false` to disable both automatic submission paths.
+Silence never submits a prompt. Say a configured submit phrase to send. The six-minute recording limit prevents an abandoned recording from running forever.
 
 The configured submit phrase creates an audio cutoff. After a brief pause, Voice Control also checkpoints the live preview before the submit phrase begins, so the phrase and anything spoken after it are excluded even when Apple spells the phrase incorrectly. Say a configured cancel phrase to clear the live preview, discard the recording, and return to wake listening without submitting.
 

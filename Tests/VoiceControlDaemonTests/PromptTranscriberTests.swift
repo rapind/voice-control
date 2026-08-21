@@ -17,7 +17,7 @@ import Testing
   #expect(transcript.audioEndTimeForSubmission(excludingLatestSeparatedBurst: true) == 3.9)
 }
 
-@Test func silenceSubmissionUsesTheLatestLiveRevision() {
+@Test func maximumDurationSubmissionUsesTheLatestLiveRevision() {
   var transcript = LiveTranscriptCheckpoint()
   transcript.update("store this value as a Norway")
   transcript.update("store this value as an array")

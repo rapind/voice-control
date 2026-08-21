@@ -16,7 +16,7 @@ Apple progressive transcription treats the latest live preview as the authoritat
 
 Each visible progressive preview records the latest prompt audio position it covers. Explicit submission preserves that preview when it already covers the required prompt audio, so closing the live input cannot trigger an unnecessary Apple rewrite. When the preview is behind, submission closes the live audio input and waits up to one second for a progressive callback that covers the required position. If Apple does not catch up, Voice Control transcribes the saved recording instead of submitting an older progressive preview.
 
-Automatic submission is configurable and enabled by default. Six seconds of silence submits the current prompt, and a six-minute maximum duration prevents an abandoned recording from running forever. A configured submit phrase sends immediately. When `automatic_submit = false`, neither silence nor maximum recording duration submits a prompt.
+Silence never submits a prompt. A configured submit phrase sends immediately, and a six-minute maximum duration prevents an abandoned recording from running forever.
 
 The Parakeet fallback continues to transcribe the finished file because its rolling live preview is intended as feedback rather than its authoritative full-context result. An empty cut is rejected before any fallback file transcription.
 

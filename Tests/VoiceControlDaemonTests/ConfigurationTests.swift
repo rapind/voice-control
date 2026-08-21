@@ -376,8 +376,6 @@ import Testing
       wake = ["computer", "hey computer"]
       submit = ["do it"]
       cancel = ["never mind"]
-      automatic_submit = true
-      silence_seconds = 6.5
       silence_threshold_db = -38
       maximum_recording_seconds = 120
       voice_processing = true
@@ -391,8 +389,6 @@ import Testing
   #expect(configuration.wakePhrases == ["computer", "hey computer"])
   #expect(configuration.submitPhrases == ["do it"])
   #expect(configuration.cancelPhrases == ["never mind"])
-  #expect(configuration.automaticSubmitEnabled)
-  #expect(configuration.silenceSeconds == 6.5)
   #expect(configuration.silenceThresholdDB == -38)
   #expect(configuration.maximumRecordingSeconds == 120)
   #expect(configuration.voiceProcessingEnabled)
@@ -400,11 +396,9 @@ import Testing
   #expect(configuration.applicationCommands[.ghostty]?.focus1 == ["focus one", "folk one"])
 }
 
-@Test func defaultsToSixSecondSilenceAndSixMinuteRecordingLimits() throws {
+@Test func defaultsToSixMinuteRecordingLimit() throws {
   let configuration = try Configuration.decodeTOML(Data())
 
-  #expect(configuration.automaticSubmitEnabled)
-  #expect(configuration.silenceSeconds == 6)
   #expect(configuration.maximumRecordingSeconds == 360)
 }
 

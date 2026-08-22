@@ -216,63 +216,7 @@ actor AppleSpeechTranscriber: PromptTranscriberBackend {
     await resultTask?.value
     clearSession()
     if let error { throw error }
-    return LiveTranscriptionFinishResult(
-      text: text,
-      coveredRequestedAudio: covered
-    )
-  }
-
-  func transcribe(fileURL: URL) async throws -> String {
-    guard let analyzer else {
-      return try await transcribeFile(fileURL)
-    }
-
-    await feederTask?.value
-    feederTask = nil
-    inputBuilder?.finish()
-    inputBuilder = nil
-    do {
-      try await analyzer.finalizeAndFinishThroughEndOfInput()
-      await resultTask?.value
-      resultTask = nil
-      let text = finalizedText
-      let error = liveError
-      clearSession()
-      if let error { throw error }
-      if !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-        return text
-      }
-      return try await transcribeFile(fileURL)
-    } catch {
-      await analyzer.cancelAndFinishNow()
-      resultTask?.cancel()
-      await resultTask?.value
-      clearSession()
-      throw error
-    }
-  }
-
-  private func transcribeFile(_ fileURL: URL) async throws -> String {
-    guard let locale else {
-      throw AppleSpeechError("Apple Speech is not prepared")
-    }
-    let transcriber = SpeechTranscriber(locale: locale, preset: .transcription)
-    let audioFile = try AVAudioFile(forReading: fileURL)
-    async let transcript: String = {
-      var text = ""
-      for try await result in transcriber.results {
-        text += String(result.text.characters)
-      }
-      return text
-    }()
-
-    let analyzer = SpeechAnalyzer(modules: [transcriber])
-    if let lastSample = try await analyzer.analyzeSequence(from: audioFile) {
-      try await analyzer.finalizeAndFinish(through: lastSample)
-    } else {
-      await analyzer.cancelAndFinishNow()
-    }
-    return try await transcript
+    return LiveTranscriptionFinishResult(text: text)
   }
 
   private func clearSession() {

@@ -27,7 +27,11 @@ extension PromptTranscriberBackend {
     _ request: LiveTranscriptionFinishRequest
   ) async throws -> LiveTranscriptionFinishResult {
     await stopLiveTranscription()
-    return LiveTranscriptionFinishResult(text: nil, coveredRequestedAudio: false)
+    return LiveTranscriptionFinishResult(text: nil)
+  }
+
+  func transcribe(fileURL: URL) async throws -> String {
+    throw PromptTranscriptionError("\(name) does not support full-file transcription")
   }
 }
 
@@ -38,7 +42,6 @@ struct LiveTranscriptionFinishRequest: Equatable, Sendable {
 
 struct LiveTranscriptionFinishResult: Equatable, Sendable {
   let text: String?
-  let coveredRequestedAudio: Bool
 }
 
 struct LiveTranscriptionUpdate: Equatable, Sendable {
@@ -173,9 +176,7 @@ final class PromptTranscriber {
       if preferredTranscriptCoversRequest, let preferredText {
         return preferredText
       }
-      if completedLiveTranscript.coveredRequestedAudio,
-        let text = completedLiveTranscript.text
-      {
+      if let text = completedLiveTranscript.text {
         let liveTranscript = text.trimmingCharacters(
           in: .whitespacesAndNewlines
         )
@@ -183,7 +184,7 @@ final class PromptTranscriber {
           return liveTranscript
         }
       }
-      if completedLiveTranscript.coveredRequestedAudio, let preferredLiveTranscript {
+      if let preferredLiveTranscript {
         let liveTranscript = preferredLiveTranscript.trimmingCharacters(
           in: .whitespacesAndNewlines
         )
@@ -191,9 +192,20 @@ final class PromptTranscriber {
           return liveTranscript
         }
       }
+      throw PromptTranscriptionError("Apple Speech returned no usable live transcript")
     }
     return try await backend.transcribe(fileURL: fileURL)
   }
+}
+
+struct PromptTranscriptionError: LocalizedError {
+  let message: String
+
+  init(_ message: String) {
+    self.message = message
+  }
+
+  var errorDescription: String? { message }
 }
 
 actor ParakeetTranscriber: PromptTranscriberBackend {

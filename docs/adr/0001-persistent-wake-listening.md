@@ -12,7 +12,9 @@ Audio capture uses the microphone's raw mono signal by default because Apple's c
 
 Audio capture follows the macOS default input device. Connecting AirPods may change both the default input and output, even when a USB microphone was previously selected. An `AVAudioEngine` configuration change while waiting for a wake phrase stops capture immediately, waits for the new route to settle, and restarts capture and keyword recognition using the new input's current hardware format. The ambient noise floor is recalibrated for that input. Disconnecting the device follows the same path back to the next system default.
 
-Core Audio may also stop `AVAudioEngine` and release the microphone assertion while the daemon process remains alive. While waiting for a wake phrase, the daemon checks every five seconds that the engine is running and still delivering audio buffers. If either check fails, it restarts both audio capture and keyword recognition. It does not perform route recovery during an active prompt recording.
+Core Audio may also stop `AVAudioEngine` and release the microphone assertion while the daemon process remains alive. While waiting for a wake phrase, the daemon checks every five seconds that the engine is running and still delivering audio buffers. If either check fails, it restarts both audio capture and keyword recognition.
+
+An input-device change during an active prompt makes that recording unreliable. The daemon stops the prompt, leaves its progressive preview visible in the target application, reports the interruption, and returns to wake listening after the new route settles. It never leaves the state machine recording against a stopped capture stream.
 
 The input tap keeps using the microphone's explicit hardware format because an AirPods input may expose a stale client format during its 24 kHz and 48 kHz transitions. `AVAudioNode.installTap` can raise an Objective-C exception when the hardware changes between reading that format and installing the tap. A narrow Objective-C boundary converts that exception into an ordinary Swift error. The existing recovery loop can then wait and retry instead of allowing AVFAudio to abort the daemon.
 
@@ -27,7 +29,7 @@ The installed LaunchAgent supervises the executable inside the application bundl
 - Recovery may take up to five seconds after the input engine stops.
 - A format change during tap installation becomes a retryable recovery failure instead of terminating the process.
 - A process crash restarts automatically, while an intentional quit remains stopped.
-- An active prompt keeps its captured audio and is never replaced by idle recovery.
+- An active prompt interrupted by an input-device change stops explicitly and preserves its visible preview instead of becoming stranded.
 - Wake listener recovery is an explicit runtime responsibility, not a side effect of process liveness.
 
 ## References

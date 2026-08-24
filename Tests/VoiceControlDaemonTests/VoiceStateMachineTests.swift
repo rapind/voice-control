@@ -69,6 +69,18 @@ import Testing
       restartIsScheduled: true))
 }
 
+@Test func audioRouteChangesAbortAnActivePromptInsteadOfLeavingItStranded() {
+  #expect(
+    AudioRouteChangeRecovery.action(for: .waitingForWake) == .restartWakeListener
+  )
+  #expect(
+    AudioRouteChangeRecovery.action(for: .recording) == .failActivePrompt
+  )
+  #expect(
+    AudioRouteChangeRecovery.action(for: .transcribing) == .ignore
+  )
+}
+
 @Test func promptCaptureWaitsForTheWakeConfirmationSoundToFinish() {
   #expect(WakeConfirmation.captureDelay(soundDuration: nil) == 0)
   #expect(WakeConfirmation.captureDelay(soundDuration: 0) == 0)

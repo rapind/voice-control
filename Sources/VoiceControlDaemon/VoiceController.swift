@@ -627,8 +627,18 @@ final class VoiceController {
   }
 
   private func handleAudioConfigurationChange() {
-    guard machine.phase == .waitingForWake else { return }
-    logger.notice("Audio route changed; scheduling wake listener restart")
+    switch AudioRouteChangeRecovery.action(for: machine.phase) {
+    case .ignore:
+      return
+    case .failActivePrompt:
+      logger.error("Audio route changed during prompt recording; aborting the active prompt")
+      ambientNoiseFloor = AmbientNoiseFloor()
+      fail("The microphone changed during recording; the prompt was stopped")
+      audio.stop()
+      return
+    case .restartWakeListener:
+      logger.notice("Audio route changed; scheduling wake listener restart")
+    }
     // The engine reconfigures asynchronously when the input device changes.
     // Restarting immediately races that reconfiguration: the tap can be
     // installed with a stale format, which leaves the engine running without
@@ -748,7 +758,7 @@ final class VoiceController {
     promptCaptureStartWorkItem = nil
     promptCaptureStarted = false
     stopLiveTranscription()
-    _ = audio.finishRecording()
+    discardPromptRecording()
     dispatch(.failed(message))
     guard recover else { return }
     DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
@@ -771,6 +781,23 @@ final class VoiceController {
     print(
       "  Apple voice processing: \(configuration.voiceProcessingEnabled ? "enabled" : "disabled")")
     print("  transcription: \(transcriber.name)")
+  }
+}
+
+enum AudioRouteChangeRecovery: Equatable {
+  case ignore
+  case restartWakeListener
+  case failActivePrompt
+
+  static func action(for phase: VoicePhase) -> Self {
+    switch phase {
+    case .waitingForWake:
+      return .restartWakeListener
+    case .recording:
+      return .failActivePrompt
+    default:
+      return .ignore
+    }
   }
 }
 

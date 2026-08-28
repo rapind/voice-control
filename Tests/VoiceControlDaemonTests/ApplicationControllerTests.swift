@@ -32,6 +32,12 @@ import Testing
   #expect(ScrollCommand.pixelsToEnd == 20_000)
 }
 
+@Test func scrollEventsTargetTheRightEdgeOfTheWindow() {
+  let bounds = CGRect(x: 120, y: 40, width: 1_000, height: 700)
+
+  #expect(ApplicationController.scrollEventLocation(in: bounds) == CGPoint(x: 1_112, y: 390))
+}
+
 @Test func chatGPTTabCommandsUseTheAppMenuShortcuts() throws {
   let controller = ApplicationController()
   let newTab = try #require(controller.keyStroke(for: .newChat, target: .chatGPT))

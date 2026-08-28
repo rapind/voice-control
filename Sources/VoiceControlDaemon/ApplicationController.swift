@@ -445,7 +445,7 @@ final class ApplicationController {
     targetPID: pid_t?,
     completion: @escaping (Result<Void, Error>) -> Void
   ) {
-    guard let point = frontmostWindowCenter(targetPID: targetPID) else {
+    guard let point = frontmostWindowScrollLocation(targetPID: targetPID) else {
       completion(.failure(InjectionError("Could not find the frontmost window to scroll")))
       return
     }
@@ -468,7 +468,7 @@ final class ApplicationController {
     completion(.success(()))
   }
 
-  private func frontmostWindowCenter(targetPID: pid_t?) -> CGPoint? {
+  private func frontmostWindowScrollLocation(targetPID: pid_t?) -> CGPoint? {
     guard let targetPID else { return nil }
     guard
       let infoList = CGWindowListCopyWindowInfo(
@@ -494,7 +494,11 @@ final class ApplicationController {
     else {
       return nil
     }
-    return CGPoint(x: x + width / 2, y: y + height / 2)
+    return Self.scrollEventLocation(in: CGRect(x: x, y: y, width: width, height: height))
+  }
+
+  static func scrollEventLocation(in bounds: CGRect) -> CGPoint {
+    CGPoint(x: bounds.maxX - 8, y: bounds.midY)
   }
 
   private static func windowArea(_ info: [String: Any]) -> CGFloat {

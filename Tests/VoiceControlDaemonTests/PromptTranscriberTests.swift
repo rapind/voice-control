@@ -4,28 +4,12 @@ import Testing
 
 @testable import VoiceControlDaemon
 
-@Test func separatelySpokenSubmitPhraseUsesTheLiveTranscriptBeforeThatBurst() {
-  var transcript = LiveTranscriptCheckpoint()
-  transcript.update("store this value as an array", audioEndTime: 3.9)
-  transcript.beginSeparatedSpeechBurst()
-  transcript.update("store this value as an array Sunday", audioEndTime: 5.2)
-
-  #expect(
-    transcript.textForSubmission(excludingLatestSeparatedBurst: true)
-      == "store this value as an array"
-  )
-  #expect(transcript.audioEndTimeForSubmission(excludingLatestSeparatedBurst: true) == 3.9)
-}
-
 @Test func maximumDurationSubmissionUsesTheLatestLiveRevision() {
   var transcript = LiveTranscriptCheckpoint()
   transcript.update("store this value as a Norway")
   transcript.update("store this value as an array")
 
-  #expect(
-    transcript.textForSubmission(excludingLatestSeparatedBurst: false)
-      == "store this value as an array"
-  )
+  #expect(transcript.latestText == "store this value as an array")
 }
 
 @Test func emptyAuthoritativeLiveTranscriptFailsWithoutFullFileTranscription() async {

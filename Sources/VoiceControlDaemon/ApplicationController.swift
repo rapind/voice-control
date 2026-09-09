@@ -427,7 +427,8 @@ final class ApplicationController {
       return nil
     case .scrollUp, .scrollDown, .scrollEnd:
       return nil
-    case .launchMusic, .playMusic, .pauseMusic, .nextSong, .previousSong, .sleepMacBook:
+    case .launchMusic, .playMusic, .pauseMusic, .nextSong, .previousSong, .sleepMacBook,
+      .pauseVoiceControl:
       return nil
     case .focusItem(let number):
       let keyCodes: [Int: CGKeyCode] = [

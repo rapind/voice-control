@@ -19,6 +19,7 @@ enum ApplicationCommand: Equatable, Hashable {
   case nextSong
   case previousSong
   case sleepMacBook
+  case pauseVoiceControl
   case focusItem(Int)
 
   var focusTarget: ApplicationTarget? {
@@ -33,6 +34,8 @@ enum ApplicationCommand: Equatable, Hashable {
     case .clearContext, .compactContext, .scrollUp, .scrollDown, .scrollEnd,
       .launchMusic, .playMusic, .pauseMusic, .nextSong, .previousSong, .sleepMacBook:
       return true
+    case .pauseVoiceControl:
+      return true
     default:
       return false
     }
@@ -40,7 +43,8 @@ enum ApplicationCommand: Equatable, Hashable {
 
   var isGlobalDirectCommand: Bool {
     switch self {
-    case .launchMusic, .playMusic, .pauseMusic, .nextSong, .previousSong, .sleepMacBook:
+    case .launchMusic, .playMusic, .pauseMusic, .nextSong, .previousSong, .sleepMacBook,
+      .pauseVoiceControl:
       return true
     default:
       return false

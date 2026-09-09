@@ -12,6 +12,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
   private let cancelMenuItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
   private let configStatusMenuItem = NSMenuItem(
     title: "Config: loaded", action: nil, keyEquivalent: "")
+  private lazy var pauseMenuItem: NSMenuItem = {
+    let item = NSMenuItem(
+      title: "Pause Voice Control", action: #selector(togglePause), keyEquivalent: "")
+    item.target = self
+    return item
+  }()
+  private var isPaused = false
 
   init(configurationStore: ConfigurationStore) {
     self.configurationStore = configurationStore
@@ -55,6 +62,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     NSApplication.shared.terminate(nil)
   }
 
+  @objc private func togglePause() {
+    if isPaused {
+      controller?.resume()
+    } else {
+      controller?.pause()
+    }
+  }
+
   private func installStatusItem(configuration: Configuration) {
     let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
     item.button?.title = "VC …"
@@ -72,6 +87,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     menu.addItem(cancelMenuItem)
     menu.addItem(configStatusMenuItem)
     menu.addItem(.separator())
+    menu.addItem(pauseMenuItem)
     let openConfigItem = NSMenuItem(
       title: "Open Configuration", action: #selector(openConfiguration), keyEquivalent: ",")
     openConfigItem.target = self
@@ -94,6 +110,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
   private func updateStatus(_ phase: VoicePhase) {
     stateMenuItem.title = phase.description
+    isPaused = phase == .paused
+    pauseMenuItem.title = isPaused ? "Resume Voice Control" : "Pause Voice Control"
     switch phase {
     case .starting:
       statusItem?.button?.title = "VC …"
@@ -105,6 +123,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
       statusItem?.button?.title = "VC text"
     case .injecting:
       statusItem?.button?.title = "VC send"
+    case .paused:
+      statusItem?.button?.title = "VC paused"
     case .failed:
       statusItem?.button?.title = "VC !"
     }

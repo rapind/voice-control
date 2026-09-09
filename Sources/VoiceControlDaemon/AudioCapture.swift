@@ -17,7 +17,6 @@ final class AudioCapture {
   )
   private var recordingFile: AVAudioFile?
   private var recordingURL: URL?
-  private var recordingStartAudioTime: TimeInterval?
   private var totalCapturedTime: TimeInterval = 0
   private var tapInstalled = false
   private var tapFormat: AVAudioFormat?
@@ -191,38 +190,18 @@ final class AudioCapture {
     let startAudioTime = totalCapturedTime
     recordingURL = url
     recordingFile = file
-    recordingStartAudioTime = startAudioTime
     lock.unlock()
     return startAudioTime
   }
 
   func finishRecording() -> URL? {
-    takeRecording()?.url
-  }
-
-  func finishRecording(endingAtAudioTime cutoffAudioTime: TimeInterval) throws -> URL? {
-    guard let recording = takeRecording() else { return nil }
-    let durationToKeep = RecordingCutoff.durationToKeep(
-      recordingStartAudioTime: recording.startAudioTime,
-      controlPhraseStartAudioTime: cutoffAudioTime,
-      safetyMargin: 0.12
-    )
-    do {
-      return try RecordingTrimmer.trim(
-        recording.url,
-        keepingFirst: durationToKeep
-      )
-    } catch {
-      try? FileManager.default.removeItem(at: recording.url)
-      throw error
-    }
+    takeRecording()
   }
 
   func stop() {
     lock.lock()
     recordingFile = nil
     recordingURL = nil
-    recordingStartAudioTime = nil
     loggedFirstBuffer = false
     lock.unlock()
     if tapInstalled {
@@ -234,16 +213,13 @@ final class AudioCapture {
     engine.stop()
   }
 
-  private func takeRecording() -> (url: URL, startAudioTime: TimeInterval)? {
+  private func takeRecording() -> URL? {
     lock.lock()
     let url = recordingURL
-    let startAudioTime = recordingStartAudioTime
     recordingFile = nil
     recordingURL = nil
-    recordingStartAudioTime = nil
     lock.unlock()
-    guard let url, let startAudioTime else { return nil }
-    return (url, startAudioTime)
+    return url
   }
 
   private func matchesTapFormat(_ format: AVAudioFormat) -> Bool {
@@ -280,21 +256,9 @@ struct AudioLevelSample: Equatable {
 }
 
 struct SpeechBurstTracker {
-  let separatingSilence: TimeInterval
-
-  private(set) var currentBurstStartAudioTime: TimeInterval?
-  private(set) var latestSeparatedBurstStartAudioTime: TimeInterval?
-  private(set) var latestCompletedBurstEndAudioTime: TimeInterval?
   private(set) var latestSpeechEndAudioTime: TimeInterval?
 
-  init(separatingSilence: TimeInterval) {
-    self.separatingSilence = separatingSilence
-  }
-
   mutating func reset() {
-    currentBurstStartAudioTime = nil
-    latestSeparatedBurstStartAudioTime = nil
-    latestCompletedBurstEndAudioTime = nil
     latestSpeechEndAudioTime = nil
   }
 
@@ -303,17 +267,6 @@ struct SpeechBurstTracker {
     speechThresholdDB: Float
   ) {
     guard sample.levelDB >= speechThresholdDB else { return }
-
-    if let latestSpeechEndAudioTime {
-      let silence = sample.startTime - latestSpeechEndAudioTime
-      if silence >= separatingSilence {
-        latestCompletedBurstEndAudioTime = latestSpeechEndAudioTime
-        currentBurstStartAudioTime = sample.startTime
-        latestSeparatedBurstStartAudioTime = sample.startTime
-      }
-    } else {
-      currentBurstStartAudioTime = sample.startTime
-    }
 
     latestSpeechEndAudioTime = sample.startTime + sample.duration
   }
@@ -412,78 +365,6 @@ enum AudioCaptureBufferNormalizer {
       count: Int(input.frameLength)
     )
     return output
-  }
-}
-
-enum RecordingTrimmer {
-  static func trim(
-    _ url: URL,
-    keepingFirst duration: TimeInterval
-  ) throws -> URL {
-    let source = try AVAudioFile(forReading: url)
-    let frameCount = RecordingCutoff.frameCountToKeep(
-      duration: duration,
-      sampleRate: source.processingFormat.sampleRate,
-      availableFrames: source.length
-    )
-    guard frameCount > 0 else {
-      throw AudioCaptureError("No prompt was recorded before the submit command")
-    }
-    guard frameCount < source.length else { return url }
-
-    let trimmedURL = url.deletingPathExtension()
-      .appendingPathExtension("trimmed.wav")
-    do {
-      let destination = try AVAudioFile(
-        forWriting: trimmedURL,
-        settings: source.fileFormat.settings
-      )
-      let capacity = AVAudioFrameCount(min(4_096, max(frameCount, 1)))
-      guard
-        let buffer = AVAudioPCMBuffer(
-          pcmFormat: source.processingFormat,
-          frameCapacity: capacity
-        )
-      else {
-        throw AudioCaptureError("Could not allocate the recording trim buffer")
-      }
-
-      var remaining = frameCount
-      while remaining > 0 {
-        let requested = AVAudioFrameCount(min(AVAudioFramePosition(capacity), remaining))
-        try source.read(into: buffer, frameCount: requested)
-        guard buffer.frameLength > 0 else { break }
-        try destination.write(from: buffer)
-        remaining -= AVAudioFramePosition(buffer.frameLength)
-      }
-      try FileManager.default.removeItem(at: url)
-      return trimmedURL
-    } catch {
-      try? FileManager.default.removeItem(at: trimmedURL)
-      throw error
-    }
-  }
-}
-
-enum RecordingCutoff {
-  static func durationToKeep(
-    recordingStartAudioTime: TimeInterval,
-    controlPhraseStartAudioTime: TimeInterval,
-    safetyMargin: TimeInterval
-  ) -> TimeInterval {
-    max(0, controlPhraseStartAudioTime - recordingStartAudioTime - max(0, safetyMargin))
-  }
-
-  static func frameCountToKeep(
-    duration: TimeInterval,
-    sampleRate: Double,
-    availableFrames: AVAudioFramePosition
-  ) -> AVAudioFramePosition {
-    guard sampleRate > 0, availableFrames > 0 else { return 0 }
-    let retainedFrames = AVAudioFramePosition(
-      (max(0, duration) * sampleRate).rounded(.down)
-    )
-    return min(availableFrames, retainedFrames)
   }
 }
 

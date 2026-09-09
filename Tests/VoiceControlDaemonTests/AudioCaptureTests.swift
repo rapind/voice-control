@@ -120,8 +120,8 @@ import Testing
   #expect(noiseFloor.speechThreshold(fallback: -45) == -45)
 }
 
-@Test func tracksSubmitSpeechBurstOnTheRecordingAudioTimeline() {
-  var tracker = SpeechBurstTracker(separatingSilence: 0.6)
+@Test func tracksSpeechEndAcrossNoiseGaps() {
+  var tracker = SpeechBurstTracker()
 
   tracker.observe(
     AudioLevelSample(levelDB: -20, startTime: 100, duration: 0.4),
@@ -148,50 +148,16 @@ import Testing
     speechThresholdDB: -45
   )
 
-  #expect(tracker.latestSeparatedBurstStartAudioTime == 101.4)
-  #expect(tracker.latestCompletedBurstEndAudioTime == 100.4)
+  #expect(abs((tracker.latestSpeechEndAudioTime ?? 0) - 102.1) < 0.000_001)
 }
 
-@Test func doesNotCutAtTheStartOfAContinuousPrompt() {
-  var tracker = SpeechBurstTracker(separatingSilence: 0.6)
+@Test func tracksTheLatestSpeechEndTime() {
+  var tracker = SpeechBurstTracker()
 
   tracker.observe(
     AudioLevelSample(levelDB: -20, startTime: 100, duration: 2),
     speechThresholdDB: -45
   )
 
-  #expect(tracker.latestSeparatedBurstStartAudioTime == nil)
   #expect(tracker.latestSpeechEndAudioTime == 102)
-}
-
-@Test func submitCutoffRejectsAStaleBurstFromTheFinalSentence() {
-  let match = ControlPhraseMatch(
-    phrase: "send it",
-    startTime: 112.4,
-    endTime: 113,
-    transcriptEndTime: 113
-  )
-
-  #expect(
-    SubmitPhraseCutoff.audioTime(
-      for: match,
-      latestSeparatedBurstStartAudioTime: 106.2
-    ) == nil
-  )
-}
-
-@Test func submitCutoffStartsInsideTheSilenceBeforeAnAlignedSubmitPhrase() {
-  let match = ControlPhraseMatch(
-    phrase: "send it",
-    startTime: 112.4,
-    endTime: 113,
-    transcriptEndTime: 113
-  )
-
-  #expect(
-    SubmitPhraseCutoff.audioTime(
-      for: match,
-      latestSeparatedBurstStartAudioTime: 112.1
-    ) == 111.85
-  )
 }

@@ -142,7 +142,8 @@ struct Configuration: Equatable {
     (.previousSong, ["media previous"]),
   ]
   private static let systemMappings: [(ApplicationCommand, [String])] = [
-    (.sleepMacBook, ["sleep MacBook", "sleep Mac book"])
+    (.sleepMacBook, ["sleep MacBook", "sleep Mac book"]),
+    (.pauseVoiceControl, ["pause voice control"]),
   ]
 
   var wakePhrases: [String]

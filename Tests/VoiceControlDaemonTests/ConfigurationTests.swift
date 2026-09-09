@@ -264,6 +264,22 @@ import Testing
   )
 }
 
+@Test func pauseVoiceControlIsAGlobalDirectCommand() throws {
+  let configuration = try Configuration.decodeTOML(Data())
+
+  for target in ApplicationTarget.allCases.map(Optional.some) + [nil] {
+    #expect(
+      ApplicationCommand.parse(
+        "pause voice control",
+        wakePhrases: configuration.wakePhrases,
+        mappings: configuration.commandMappings(for: target)
+      ) == .pauseVoiceControl
+    )
+  }
+  #expect(ApplicationCommand.pauseVoiceControl.isDirectCommand)
+  #expect(ApplicationCommand.pauseVoiceControl.isGlobalDirectCommand)
+}
+
 @Test func vocabularyTermsJoinSpeechContext() throws {
   let configuration = try Configuration.decodeTOML(
     Data("vocabulary = [\"bean\"]".utf8)
@@ -586,41 +602,29 @@ import Testing
   )
 }
 
-@Test func cleansConfiguredWakeAndSubmitAliases() {
+@Test func cleansConfiguredWakeAliasButKeepsSubmitPhrase() {
   #expect(
     PhraseMatcher.cleanFinalTranscript(
       "Hey computer write the test do it",
-      wakePhrases: ["computer", "hey computer"],
-      submitPhrases: ["do it", "ship it"]
-    ) == "write the test"
+      wakePhrases: ["computer", "hey computer"]
+    ) == "write the test do it"
   )
 }
 
-@Test func preservesPunctuationBeforeConfiguredSubmitPhrase() {
+@Test func preservesPunctuationAndConfiguredSubmitPhrase() {
   #expect(
     PhraseMatcher.cleanFinalTranscript(
       "Here is a short prompt. Send it.",
-      wakePhrases: ["pewter"],
-      submitPhrases: ["send it", "sent it"]
-    ) == "Here is a short prompt."
+      wakePhrases: ["pewter"]
+    ) == "Here is a short prompt. Send it."
   )
 }
 
-@Test func explicitSubmissionRemovesAPartiallyTranscribedSubmitPhrase() {
+@Test func explicitSubmissionKeepsAPartiallyTranscribedSubmitPhrase() {
   #expect(
     PhraseMatcher.cleanFinalTranscript(
       "Agreed. Send",
-      wakePhrases: ["computer"],
-      submitPhrases: ["send it", "sent it"],
-      explicitSubmitDetected: true
-    ) == "Agreed."
-  )
-  #expect(
-    PhraseMatcher.cleanFinalTranscript(
-      "Agreed. Send",
-      wakePhrases: ["computer"],
-      submitPhrases: ["send it", "sent it"],
-      explicitSubmitDetected: false
+      wakePhrases: ["computer"]
     ) == "Agreed. Send"
   )
 }
@@ -672,83 +676,6 @@ import Testing
       maximumTrailingWords: 3
     ) == nil
   )
-}
-
-@Test func calculatesRecordingFramesToKeepBeforeSubmitPhrase() {
-  #expect(
-    RecordingCutoff.frameCountToKeep(
-      duration: 1.25,
-      sampleRate: 16_000,
-      availableFrames: 40_000
-    ) == 20_000
-  )
-  #expect(
-    RecordingCutoff.frameCountToKeep(
-      duration: -1,
-      sampleRate: 16_000,
-      availableFrames: 40_000
-    ) == 0
-  )
-  #expect(
-    RecordingCutoff.frameCountToKeep(
-      duration: 10,
-      sampleRate: 16_000,
-      availableFrames: 40_000
-    ) == 40_000
-  )
-}
-
-@Test func recordingCutoffStopsBeforeSubmitPhraseDespiteRecognitionDelay() {
-  #expect(
-    RecordingCutoff.durationToKeep(
-      recordingStartAudioTime: 10,
-      controlPhraseStartAudioTime: 15,
-      safetyMargin: 0.12
-    ) == 4.88
-  )
-}
-
-@Test func trimsRecordedAudioAtSubmitTimestamp() throws {
-  let directory = FileManager.default.temporaryDirectory
-    .appendingPathComponent(UUID().uuidString, isDirectory: true)
-  try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-  defer { try? FileManager.default.removeItem(at: directory) }
-  let sourceURL = directory.appendingPathComponent("prompt.wav")
-  let format = AVAudioFormat(standardFormatWithSampleRate: 48_000, channels: 1)!
-  let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: 48_000)!
-  buffer.frameLength = 48_000
-  memset(buffer.floatChannelData![0], 0, Int(buffer.frameLength) * MemoryLayout<Float>.size)
-  do {
-    let file = try AVAudioFile(forWriting: sourceURL, settings: format.settings)
-    try file.write(from: buffer)
-  }
-
-  let trimmedURL = try RecordingTrimmer.trim(
-    sourceURL,
-    keepingFirst: 0.5
-  )
-
-  let trimmed = try AVAudioFile(forReading: trimmedURL)
-  #expect(trimmed.length == 24_000)
-}
-
-@Test func refusesToCreateAnEmptyTrimmedRecording() throws {
-  let directory = FileManager.default.temporaryDirectory
-    .appendingPathComponent(UUID().uuidString, isDirectory: true)
-  try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-  defer { try? FileManager.default.removeItem(at: directory) }
-  let sourceURL = directory.appendingPathComponent("prompt.wav")
-  let format = AVAudioFormat(standardFormatWithSampleRate: 48_000, channels: 1)!
-  let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: 4_800)!
-  buffer.frameLength = 4_800
-  do {
-    let file = try AVAudioFile(forWriting: sourceURL, settings: format.settings)
-    try file.write(from: buffer)
-  }
-
-  #expect(throws: AudioCaptureError.self) {
-    try RecordingTrimmer.trim(sourceURL, keepingFirst: 0)
-  }
 }
 
 @Test func reconcilesRevisedPartialTranscriptFromCommonPrefix() {

@@ -23,8 +23,6 @@ final class VoiceController {
   private var targetPID: pid_t?
   private var sessionTarget: ApplicationTarget?
   private var recordingStartedAt = Date()
-  private var submitCutoffAudioTime: TimeInterval?
-  private var explicitSubmitDetected = false
   private var recordingStartAudioTime: TimeInterval?
   private var recordingLimitTimer: Timer?
   private var audioHealthTimer: Timer?
@@ -36,7 +34,7 @@ final class VoiceController {
   private var liveTranscript = LiveTranscriptCheckpoint()
   private var previewReady = false
   private var ambientNoiseFloor = AmbientNoiseFloor()
-  private var speechBurstTracker = SpeechBurstTracker(separatingSilence: 0.6)
+  private var speechBurstTracker = SpeechBurstTracker()
 
   init(configuration: Configuration) {
     self.configuration = configuration
@@ -99,6 +97,15 @@ final class VoiceController {
     promptCaptureStarted = false
     stopLiveTranscription()
     audio.stop()
+  }
+
+  func pause() {
+    dispatch(.pause)
+  }
+
+  func resume() {
+    dispatch(.resume)
+    becomeReadyIfPossible()
   }
 
   func updateConfiguration(_ configuration: Configuration) {
@@ -171,10 +178,26 @@ final class VoiceController {
         fail(error.localizedDescription)
       }
 
+    case .pauseListening:
+      recordingLimitTimer?.invalidate()
+      recordingLimitTimer = nil
+      keywords.stop()
+      audioHealthTimer?.invalidate()
+      audioHealthTimer = nil
+      audioRestartWorkItem?.cancel()
+      audioRestartWorkItem = nil
+      promptCaptureStartWorkItem?.cancel()
+      promptCaptureStartWorkItem = nil
+      promptCaptureStarted = false
+      stopLiveTranscription()
+      discardPromptRecording()
+      audio.stop()
+      if case .failure(let error) = clearLivePreview() {
+        print("ERROR: Could not clear paused live transcription: \(error.localizedDescription)")
+      }
+
     case .beginPromptRecording:
       captureSessionTarget()
-      submitCutoffAudioTime = nil
-      explicitSubmitDetected = false
       speechBurstTracker.reset()
       preview = TranscriptPreview()
       liveTranscript = LiveTranscriptCheckpoint()
@@ -193,41 +216,18 @@ final class VoiceController {
       keywords.stop()
       NSSound(named: "Pop")?.play()
       liveAudioRouter.finish()
-      let requiresTrimmedRecording = submitCutoffAudioTime != nil
-      let explicitSubmitDetected = self.explicitSubmitDetected
-      let liveTranscriptionRequest = makeLiveTranscriptionFinishRequest(
-        excludingSubmitPhrase: requiresTrimmedRecording
-      )
-      let fileURL: URL?
-      do {
-        if let submitCutoffAudioTime {
-          fileURL = try audio.finishRecording(endingAtAudioTime: submitCutoffAudioTime)
-        } else {
-          fileURL = audio.finishRecording()
-        }
-      } catch {
-        fail("Could not trim the submit command from the recording: \(error.localizedDescription)")
-        return
-      }
-      self.submitCutoffAudioTime = nil
-      self.explicitSubmitDetected = false
+      let liveTranscriptionRequest = makeLiveTranscriptionFinishRequest()
+      let fileURL = audio.finishRecording()
       recordingStartAudioTime = nil
       guard let fileURL else {
         fail("No prompt recording was available")
         return
       }
-      let preferredLiveTranscript = liveTranscript.textForSubmission(
-        excludingLatestSeparatedBurst: requiresTrimmedRecording
-      )
-      let preferredLiveTranscriptAudioEndTime = liveTranscript.audioEndTimeForSubmission(
-        excludingLatestSeparatedBurst: requiresTrimmedRecording
-      )
       transcribe(
         fileURL,
-        preferredLiveTranscript: preferredLiveTranscript,
-        preferredLiveTranscriptAudioEndTime: preferredLiveTranscriptAudioEndTime,
-        liveTranscriptionRequest: liveTranscriptionRequest,
-        explicitSubmitDetected: explicitSubmitDetected
+        preferredLiveTranscript: liveTranscript.latestText,
+        preferredLiveTranscriptAudioEndTime: liveTranscript.latestAudioEndTime,
+        liveTranscriptionRequest: liveTranscriptionRequest
       )
 
     case .cancelPromptRecording:
@@ -328,20 +328,12 @@ final class VoiceController {
       ) != nil {
         print("Cancel phrase detected")
         dispatch(.cancelDetected)
-      } else if let match = PhraseMatcher.trailingMatch(
+      } else if PhraseMatcher.trailingMatch(
         any: configuration.submitPhrases,
         in: transcript,
         maximumTrailingWords: 6
-      ) {
-        submitCutoffAudioTime = SubmitPhraseCutoff.audioTime(
-          for: match,
-          latestSeparatedBurstStartAudioTime:
-            speechBurstTracker.latestSeparatedBurstStartAudioTime
-        )
-        explicitSubmitDetected = true
-        print(
-          "Submit phrase detected; separate audio cutoff: \(submitCutoffAudioTime != nil)"
-        )
+      ) != nil {
+        print("Submit phrase detected")
         dispatch(.submitDetected)
       } else if let command = ApplicationCommand.parse(
         transcript.text,
@@ -443,13 +435,7 @@ final class VoiceController {
       let thresholdDB = ambientNoiseFloor.speechThreshold(
         fallback: configuration.silenceThresholdDB
       )
-      let previousSeparatedBurstStart = speechBurstTracker.latestSeparatedBurstStartAudioTime
       speechBurstTracker.observe(sample, speechThresholdDB: thresholdDB)
-      if speechBurstTracker.latestSeparatedBurstStartAudioTime
-        != previousSeparatedBurstStart
-      {
-        liveTranscript.beginSeparatedSpeechBurst()
-      }
     default:
       break
     }
@@ -513,21 +499,14 @@ final class VoiceController {
     recordingLimitTimer = timer
   }
 
-  private func makeLiveTranscriptionFinishRequest(
-    excludingSubmitPhrase: Bool
-  ) -> LiveTranscriptionFinishRequest? {
+  private func makeLiveTranscriptionFinishRequest() -> LiveTranscriptionFinishRequest? {
     guard let recordingStartAudioTime else { return nil }
-    let waitThroughAudioTime =
-      (excludingSubmitPhrase
-      ? speechBurstTracker.latestCompletedBurstEndAudioTime
-      : speechBurstTracker.latestSpeechEndAudioTime).map { max(0, $0 - recordingStartAudioTime) }
-    let includeAudioBeforeTime =
-      excludingSubmitPhrase
-      ? submitCutoffAudioTime.map { max(0, $0 - recordingStartAudioTime) }
-      : nil
+    let waitThroughAudioTime = speechBurstTracker.latestSpeechEndAudioTime.map {
+      max(0, $0 - recordingStartAudioTime)
+    }
     return LiveTranscriptionFinishRequest(
       waitThroughAudioTime: waitThroughAudioTime,
-      includeAudioBeforeTime: includeAudioBeforeTime
+      includeAudioBeforeTime: nil
     )
   }
 
@@ -535,8 +514,7 @@ final class VoiceController {
     _ fileURL: URL,
     preferredLiveTranscript: String,
     preferredLiveTranscriptAudioEndTime: TimeInterval?,
-    liveTranscriptionRequest: LiveTranscriptionFinishRequest?,
-    explicitSubmitDetected: Bool
+    liveTranscriptionRequest: LiveTranscriptionFinishRequest?
   ) {
     Task { @MainActor in
       defer { try? FileManager.default.removeItem(at: fileURL) }
@@ -549,9 +527,7 @@ final class VoiceController {
         )
         let cleaned = PhraseMatcher.cleanFinalTranscript(
           transcript,
-          wakePhrases: configuration.wakePhrases,
-          submitPhrases: configuration.submitPhrases,
-          explicitSubmitDetected: explicitSubmitDetected
+          wakePhrases: configuration.wakePhrases
         )
         guard !cleaned.isEmpty else {
           fail("\(transcriber.name) returned an empty prompt")
@@ -572,6 +548,10 @@ final class VoiceController {
   }
 
   private func execute(_ command: ApplicationCommand) {
+    if command == .pauseVoiceControl {
+      pause()
+      return
+    }
     if command == .sleepMacBook {
       applicationController.sleepMacBook { [weak self] result in
         self?.completeApplicationOperation(result)
@@ -809,25 +789,5 @@ enum WakeListenerHealth {
     restartIsScheduled: Bool
   ) -> Bool {
     phase == .waitingForWake && !restartIsScheduled && (!audioIsRunning || !isReceivingAudio)
-  }
-}
-
-enum SubmitPhraseCutoff {
-  private static let maximumAlignmentDifference: TimeInterval = 0.5
-  private static let preRoll: TimeInterval = 0.25
-
-  static func audioTime(
-    for match: ControlPhraseMatch,
-    latestSeparatedBurstStartAudioTime: TimeInterval?
-  ) -> TimeInterval? {
-    guard
-      match.startTime.isFinite,
-      let burstStart = latestSeparatedBurstStartAudioTime,
-      burstStart.isFinite,
-      abs(match.startTime - burstStart) <= maximumAlignmentDifference
-    else {
-      return nil
-    }
-    return max(0, burstStart - preRoll)
   }
 }

@@ -6,6 +6,7 @@ enum VoicePhase: Equatable, CustomStringConvertible {
   case recording
   case transcribing
   case injecting
+  case paused
   case failed(String)
 
   var description: String {
@@ -15,6 +16,7 @@ enum VoicePhase: Equatable, CustomStringConvertible {
     case .recording: return "recording prompt"
     case .transcribing: return "transcribing"
     case .injecting: return "sending to target application"
+    case .paused: return "paused"
     case .failed(let message): return "error: \(message)"
     }
   }
@@ -31,10 +33,13 @@ enum VoiceEvent {
   case failed(String)
   case injectionCompleted
   case recover
+  case pause
+  case resume
 }
 
-enum VoiceEffect {
+enum VoiceEffect: Equatable {
   case startWakeListening
+  case pauseListening
   case beginPromptRecording
   case stopAndTranscribe
   case cancelPromptRecording
@@ -45,9 +50,27 @@ enum VoiceEffect {
 
 struct VoiceStateMachine {
   private(set) var phase: VoicePhase = .starting
+  private var pausedWhileStarting = false
 
   mutating func handle(_ event: VoiceEvent) -> [VoiceEffect] {
     switch (phase, event) {
+    case (.paused, .resume):
+      if pausedWhileStarting {
+        pausedWhileStarting = false
+        phase = .starting
+        return []
+      }
+      phase = .waitingForWake
+      return [.startWakeListening]
+
+    case (.paused, _):
+      return []
+
+    case (_, .pause):
+      pausedWhileStarting = phase == .starting
+      phase = .paused
+      return [.pauseListening]
+
     case (.starting, .ready):
       phase = .waitingForWake
       return [.startWakeListening]

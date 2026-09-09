@@ -60,33 +60,13 @@ enum ProgressiveResultCoverage {
 
 struct LiveTranscriptCheckpoint {
   private(set) var latestText = ""
-  private var latestAudioEndTime: TimeInterval?
-  private var textBeforeLatestSeparatedBurst: String?
-  private var audioEndTimeBeforeLatestSeparatedBurst: TimeInterval?
+  private(set) var latestAudioEndTime: TimeInterval?
 
   mutating func update(_ text: String, audioEndTime: TimeInterval? = nil) {
     latestText = text
     latestAudioEndTime = audioEndTime
   }
 
-  mutating func beginSeparatedSpeechBurst() {
-    textBeforeLatestSeparatedBurst = latestText
-    audioEndTimeBeforeLatestSeparatedBurst = latestAudioEndTime
-  }
-
-  func textForSubmission(excludingLatestSeparatedBurst: Bool) -> String {
-    if excludingLatestSeparatedBurst, let textBeforeLatestSeparatedBurst {
-      return textBeforeLatestSeparatedBurst
-    }
-    return latestText
-  }
-
-  func audioEndTimeForSubmission(excludingLatestSeparatedBurst: Bool) -> TimeInterval? {
-    if excludingLatestSeparatedBurst {
-      return audioEndTimeBeforeLatestSeparatedBurst
-    }
-    return latestAudioEndTime
-  }
 }
 
 final class PromptTranscriber {

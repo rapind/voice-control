@@ -105,3 +105,31 @@ import Testing
     )
   )
 }
+
+@Test func pausingStopsListeningAndResumeReturnsToIdle() {
+  var machine = VoiceStateMachine()
+  _ = machine.handle(.ready)
+
+  let pauseEffects = machine.handle(.pause)
+
+  #expect(machine.phase == .paused)
+  #expect(pauseEffects == [.pauseListening])
+
+  let resumeEffects = machine.handle(.resume)
+
+  #expect(machine.phase == .waitingForWake)
+  #expect(resumeEffects == [.startWakeListening])
+}
+
+@Test func pausingAbortsAnActivePromptBeforeResuming() {
+  var machine = VoiceStateMachine()
+  _ = machine.handle(.ready)
+  _ = machine.handle(.wakeDetected)
+
+  let pauseEffects = machine.handle(.pause)
+
+  #expect(machine.phase == .paused)
+  #expect(pauseEffects == [.pauseListening])
+  #expect(machine.handle(.submitDetected).isEmpty)
+  #expect(machine.phase == .paused)
+}

@@ -156,8 +156,8 @@ struct Configuration: Equatable {
   var applicationCommands: [ApplicationTarget: CommandPhrases]
 
   static let defaults = Configuration(
-    wakePhrases: ["tango"],
-    submitPhrases: ["yankee"],
+    wakePhrases: ["yankee"],
+    submitPhrases: ["tango"],
     cancelPhrases: ["cancel it"],
     vocabulary: [],
     silenceThresholdDB: -45,
@@ -172,8 +172,8 @@ struct Configuration: Equatable {
 
   static let defaultTOML = """
     # Voice Control reloads this file automatically after you save it.
-    wake = ["tango"]
-    submit = ["yankee"]
+    wake = ["yankee"]
+    submit = ["tango"]
     cancel = ["cancel it"]
     vocabulary = []
 

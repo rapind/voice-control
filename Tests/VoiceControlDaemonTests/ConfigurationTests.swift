@@ -66,8 +66,8 @@ import Testing
 @Test func defaultsUseFocusAndFolkPhrasesAndChatGPTTabCommands() throws {
   let configuration = try Configuration.decodeTOML(Data())
 
-  #expect(configuration.wakePhrases == ["yankee"])
-  #expect(configuration.submitPhrases == ["tango"])
+  #expect(configuration.wakePhrases == ["echo"])
+  #expect(configuration.submitPhrases == ["bravo"])
 
   for target in ApplicationTarget.allCases {
     let mappings = configuration.commandMappings(for: target)

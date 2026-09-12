@@ -48,7 +48,7 @@ The current setup is:
 ```toml
 # Voice Control reloads this file automatically after you save it.
 wake = ["echo"]
-submit = ["bravo"]
+submit = ["echo"]
 cancel = ["cancel it"]
 vocabulary = ["bean"]
 

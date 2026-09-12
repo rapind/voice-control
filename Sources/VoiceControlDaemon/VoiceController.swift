@@ -386,10 +386,12 @@ final class VoiceController {
     let now = Date()
     recordingStartedAt = now
     lastKeywordTranscript = ""
+    keywords.stop()
     let liveInput = LiveAudioBufferSink()
     liveAudioRouter.route(to: liveInput)
     startLiveTranscription(input: liveInput)
     do {
+      try keywords.start()
       recordingStartAudioTime = try audio.beginRecording()
       promptCaptureStarted = true
       startRecordingLimitTimer()

@@ -157,7 +157,7 @@ struct Configuration: Equatable {
 
   static let defaults = Configuration(
     wakePhrases: ["echo"],
-    submitPhrases: ["bravo"],
+    submitPhrases: ["echo"],
     cancelPhrases: ["cancel it"],
     vocabulary: [],
     silenceThresholdDB: -45,
@@ -173,7 +173,7 @@ struct Configuration: Equatable {
   static let defaultTOML = """
     # Voice Control reloads this file automatically after you save it.
     wake = ["echo"]
-    submit = ["bravo"]
+    submit = ["echo"]
     cancel = ["cancel it"]
     vocabulary = []
 
@@ -430,9 +430,12 @@ struct Configuration: Equatable {
         for phrase in phrases {
           let normalized = PhraseMatcher.normalize(phrase)
           if let existingOwner = owners[normalized], existingOwner != owner {
-            throw ConfigurationError(
-              "Phrase \"\(phrase)\" is assigned to both \(existingOwner) and \(owner) for \(target.rawValue)"
-            )
+            let ownersForPhrase = Set([existingOwner, owner])
+            if ownersForPhrase != Set(["wake", "submit"]) {
+              throw ConfigurationError(
+                "Phrase \"\(phrase)\" is assigned to both \(existingOwner) and \(owner) for \(target.rawValue)"
+              )
+            }
           }
           owners[normalized] = owner
         }

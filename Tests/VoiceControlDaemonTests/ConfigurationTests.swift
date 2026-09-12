@@ -67,7 +67,7 @@ import Testing
   let configuration = try Configuration.decodeTOML(Data())
 
   #expect(configuration.wakePhrases == ["echo"])
-  #expect(configuration.submitPhrases == ["bravo"])
+  #expect(configuration.submitPhrases == ["echo"])
 
   for target in ApplicationTarget.allCases {
     let mappings = configuration.commandMappings(for: target)
@@ -439,6 +439,20 @@ import Testing
   #expect(throws: ConfigurationError.self) {
     try Configuration.decodeTOML(data)
   }
+}
+
+@Test func acceptsTheSameWakeAndSubmitPhrase() throws {
+  let configuration = try Configuration.decodeTOML(
+    Data(
+      """
+      wake = ["echo"]
+      submit = ["echo"]
+      """.utf8
+    )
+  )
+
+  #expect(configuration.wakePhrases == ["echo"])
+  #expect(configuration.submitPhrases == ["echo"])
 }
 
 @Test func rejectsCollisionWithGlobalApplicationFocusPhrase() {

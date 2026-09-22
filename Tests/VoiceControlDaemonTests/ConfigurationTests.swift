@@ -672,6 +672,40 @@ import Testing
   #expect(match.map { $0.transcriptEndTime - $0.endTime } == 1.0)
 }
 
+@Test func ordinaryCancellationLanguageDoesNotDiscardDictation() throws {
+  let configuration = try Configuration.decodeTOML(Data())
+  let transcript = KeywordTranscript(
+    text: "For the refund, cancel it",
+    segments: [
+      .init(text: "For the refund", timestamp: 0, duration: 1),
+      .init(text: "cancel it", timestamp: 1, duration: 0.8),
+    ]
+  )
+
+  #expect(
+    PhraseMatcher.trailingMatch(
+      any: configuration.cancelPhrases,
+      in: transcript,
+      maximumTrailingWords: 6
+    ) == nil
+  )
+  #expect(configuration.cancelPhrases == ["zulu"])
+  let cancelTranscript = KeywordTranscript(
+    text: "For the refund, zulu",
+    segments: [
+      .init(text: "For the refund", timestamp: 0, duration: 1),
+      .init(text: "zulu", timestamp: 1, duration: 0.6),
+    ]
+  )
+  #expect(
+    PhraseMatcher.trailingMatch(
+      any: configuration.cancelPhrases,
+      in: cancelTranscript,
+      maximumTrailingWords: 6
+    )?.phrase == "zulu"
+  )
+}
+
 @Test func ignoresConfiguredControlPhraseOutsideTrailingWindow() {
   let transcript = KeywordTranscript(
     text: "send it as ordinary dictated content here",

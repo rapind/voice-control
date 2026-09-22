@@ -49,7 +49,7 @@ The current setup is:
 # Voice Control reloads this file automatically after you save it.
 wake = ["echo"]
 submit = ["echo"]
-cancel = ["cancel it"]
+cancel = ["zulu"]
 vocabulary = ["bean"]
 
 silence_threshold_db = -45

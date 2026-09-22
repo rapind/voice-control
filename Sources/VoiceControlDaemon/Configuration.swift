@@ -158,7 +158,7 @@ struct Configuration: Equatable {
   static let defaults = Configuration(
     wakePhrases: ["echo"],
     submitPhrases: ["echo"],
-    cancelPhrases: ["cancel it"],
+    cancelPhrases: ["zulu"],
     vocabulary: [],
     silenceThresholdDB: -45,
     maximumRecordingSeconds: 360,
@@ -174,7 +174,7 @@ struct Configuration: Equatable {
     # Voice Control reloads this file automatically after you save it.
     wake = ["echo"]
     submit = ["echo"]
-    cancel = ["cancel it"]
+    cancel = ["zulu"]
     vocabulary = []
 
     silence_threshold_db = -45

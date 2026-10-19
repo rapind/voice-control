@@ -94,15 +94,35 @@ final class ApplicationController {
         InjectionError("The captured application is no longer frontmost; transcription stopped"))
     }
 
-    for _ in 0..<edit.deleteCount {
-      guard postKey(keyCode: 51, flags: []) else {
-        return .failure(InjectionError("Could not revise the live transcription"))
+    guard edit.deleteCount >= 0 else {
+      return .failure(InjectionError("The live transcription edit has an invalid deletion count"))
+    }
+    guard edit.deleteCount > 0 || !edit.insertion.isEmpty else { return .success(()) }
+    do {
+      let target =
+        SafariPreviewTarget.requiresAcknowledgement(bundleIdentifier: app.bundleIdentifier)
+        ? try SafariPreviewTarget(pid: targetPID, edit: edit) : nil
+      for _ in 0..<edit.deleteCount {
+        guard postKey(keyCode: 51, flags: []) else {
+          throw InjectionError("Could not revise the live transcription")
+        }
       }
+      if edit.deleteCount > 0, let target {
+        try target.wait(for: target.edit.afterDeletion)
+      }
+      guard NSWorkspace.shared.frontmostApplication?.processIdentifier == targetPID else {
+        throw InjectionError("The captured application is no longer frontmost")
+      }
+      if !edit.insertion.isEmpty {
+        guard postText(edit.insertion) else {
+          throw InjectionError("Could not type the live transcription")
+        }
+        if let target { try target.wait(for: target.edit.afterInsertion) }
+      }
+      return .success(())
+    } catch {
+      return .failure(error)
     }
-    guard edit.insertion.isEmpty || postText(edit.insertion) else {
-      return .failure(InjectionError("Could not type the live transcription"))
-    }
-    return .success(())
   }
 
   func submitPreview(

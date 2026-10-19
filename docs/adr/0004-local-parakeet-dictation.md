@@ -21,7 +21,7 @@ Silence never submits a prompt. The configured submit phrase sends immediately, 
 - Dictation reuses local model files without downloading updates. The shared cache must contain Parakeet v3 before startup.
 - Model files in the shared cache are not checksum-pinned by this application. Replacing those files can change recognition behavior.
 - Earlier preview text can change during recording and at submission. Prefix-only retractions retain the accepted tail, which can also retain recognition mistakes until a later correction changes the words.
-- Live preview requires a writable Accessibility text selection, regardless of the application. Corrections replace the selected range in one operation and acknowledge the resulting field value. A failed acknowledgement stops dictation; there is no separate deletion phase before replacement text is sent.
+- Live preview requires a writable Accessibility text selection, regardless of the application. Corrections confirm focus and the selected range, then replace that range in one operation. Live edits do not require exact field-value acknowledgement because clients can expose placeholder text that disappears on insertion. There is no separate deletion phase before replacement text is sent.
 - Clients without writable text selections receive one insertion at submission. They have no visible live preview.
 - Wake and command recognition still depend on Apple's speech engine.
 - A trailing submit phrase is visible to clients that do not know the voice-control convention.

@@ -153,7 +153,7 @@ The configured submit phrase triggers submission and remains in the transcript. 
 
 - Dictation stays bound to the window captured at wake time. Changing windows during recording stops live typing rather than redirecting text.
 - Parakeet updates the preview after about every 1.5 seconds of additional audio and refines it with the final full-context pass at submission. Recognition time adds to the preview delay.
-- Any client with a writable Accessibility text selection receives corrections as a selected range replacement. Voice Control checks the field and selection before typing, then waits for the expected text.
+- Any client with a writable Accessibility text selection receives corrections as a selected range replacement. Voice Control confirms the focused field and selected range before typing. It does not wait for the resulting field value to match an expected string, because clients can expose placeholder text that disappears on insertion.
 - Clients without that capability receive the complete transcript once at submission. Their draft stays internal while you dictate, so live corrections cannot delete text from an input that cannot replace a range safely.
 - Live preview typing stops rather than sending text to an application that is no longer frontmost.
 - Model downloading and Hugging Face authentication are deliberately out of scope. Dictation fails clearly when the shared cached Parakeet v3 model is missing. The FluidAudio dependency is pinned in `Package.swift`; the cached model files are reused without downloading updates.

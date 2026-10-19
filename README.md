@@ -2,7 +2,7 @@
 
 Voice Control is a maintained private macOS tool for owning a complete voice transaction without wrapping OMP or interfering with the target application's rendering.
 
-The daemon listens for a wake phrase, captures the frontmost window without changing focus, shows a live transcription while recording, finalizes that transcript, and presses Return. It uses Apple Speech progressive transcription on macOS 26 and FluidAudio Parakeet on macOS 14 and 15.
+The daemon listens for a wake phrase, captures the frontmost window without changing focus, shows a live transcription while recording, finalizes that transcript, and presses Return. Dictation uses local Parakeet v3 through FluidAudio on every supported macOS version. Apple Speech handles wake phrases and commands.
 
 ## Architecture decisions
 
@@ -10,7 +10,7 @@ The current design constraints are recorded in [Architecture Decision Records](d
 
 ## Before running
 
-1. On macOS 14 or 15, load Parakeet once in TypeWhisper. The tool reuses the model files already stored in FluidAudio's shared cache. TypeWhisper does not need to remain open. On macOS 26, the app installs and uses Apple's on-device `en-US` speech asset.
+1. Load Parakeet v3 once in TypeWhisper. The tool reuses the model files already stored in FluidAudio's shared cache. TypeWhisper does not need to remain open.
 2. Run Ghostty, ChatGPT, or Google Chrome when you want to use their application shortcuts.
 
 ## Run the installed app
@@ -107,7 +107,7 @@ focus_9 = ["focus nine", "folk nine"]
 
 Save the file and the app applies valid changes within about one second. You do not need to rebuild or restart it. Invalid TOML leaves the last working configuration active and shows a config error in the menu. Older `target` settings are accepted but no longer control routing.
 
-`vocabulary` lists words and short phrases to bias Apple Speech toward during dictation. It is a recognition hint, not a replacement rule, so adding `bean` does not turn legitimate uses of `being` into `bean`.
+`vocabulary` lists words and short phrases to bias Apple Speech toward when recognizing wake phrases and commands. It does not affect Parakeet dictation or replace recognized words.
 
 The wake phrase plays its confirmation sound, then starts recording without changing focus. Dictation is bound to whichever window was frontmost when the wake phrase was recognized. Application-focus phrases, `focus ghost tee`, `focus chat`, and `focus chrome`, execute after a wake phrase.
 
@@ -143,18 +143,18 @@ For Ghostty, `new tab` creates and focuses a Herdr workspace through Herdr's API
 
 `scroll up` and `scroll down` send mouse scroll wheel events to the center of the frontmost window, so they scroll whatever is on screen without moving the cursor or changing focus.
 
-All other speech remains a normal prompt. On macOS 26, Apple progressive results revise the visible text while recording, and the last useful live revision is authoritative. Voice Control does not ask Apple to rewrite it during a final pass. On macOS 14 and 15, rolling full-context Parakeet passes provide the preview and a final file pass remains authoritative.
+All other speech remains a normal prompt. Rolling full-context Parakeet passes provide the live preview and may revise earlier words. A final Parakeet pass transcribes the complete recording for submission. Dictation does not select Apple's recognition engine based on the macOS version.
 
 Silence never submits a prompt. Say a configured submit phrase to send. The six-minute recording limit prevents an abandoned recording from running forever.
 
-The configured submit phrase creates an audio cutoff. After a brief pause, Voice Control also checkpoints the live preview before the submit phrase begins, so the phrase and anything spoken after it are excluded even when Apple spells the phrase incorrectly. Say a configured cancel phrase to clear the live preview, discard the recording, and return to wake listening without submitting.
+The configured submit phrase triggers submission and remains in the transcript. The receiving agent treats the trailing phrase as control residue. Say a configured cancel phrase to clear the live preview, discard the recording, and return to wake listening without submitting.
 
 ## Operational limits
 
 - Dictation stays bound to the window captured at wake time. Changing windows during recording stops live typing rather than redirecting text.
-- Apple Speech preview results may revise earlier words while recording, but Voice Control submits the last useful live revision without Apple’s final rewrite. The Parakeet fallback updates about every 1.5 seconds and replaces its preview with the final full-context pass.
+- Parakeet updates the preview after about every 1.5 seconds of additional audio and replaces it with the final full-context pass at submission. Recognition time adds to the preview delay.
 - Live preview typing stops rather than sending text to an application that is no longer frontmost.
-- Model downloading and Hugging Face authentication are deliberately out of scope for the Parakeet fallback. It fails clearly when the shared cached model is missing. Apple Speech assets are installed through `AssetInventory`.
+- Model downloading and Hugging Face authentication are deliberately out of scope. Dictation fails clearly when the shared cached Parakeet v3 model is missing. The FluidAudio dependency is pinned in `Package.swift`; the cached model files are reused without downloading updates.
 - Apple voice processing can be enabled with `voice_processing = true`, but it is disabled by default because its call-oriented filtering weakens far-field dictation. When enabled, its multichannel device output is normalized to mono before recognition and recording.
 - Silence detection measures the processed room noise while waiting for the wake phrase and sets its speech threshold 8 dB above that floor. `silence_threshold_db` is used until calibration completes.
 - Media transport commands target whichever application currently owns the macOS media session. They do not choose a playlist when no media session exists. Use `media launch` to open YouTube Music first.

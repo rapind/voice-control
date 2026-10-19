@@ -4,6 +4,12 @@ import Testing
 
 @testable import VoiceControlDaemon
 
+@Test func defaultDictationUsesParakeetOnEveryMacOSVersion() {
+  let transcriber = PromptTranscriber(contextualStrings: ["Echo"])
+
+  #expect(transcriber.name == "local Parakeet v3 via FluidAudio")
+}
+
 @Test func maximumDurationSubmissionUsesTheLatestLiveRevision() {
   var transcript = LiveTranscriptCheckpoint()
   transcript.update("store this value as a Norway")

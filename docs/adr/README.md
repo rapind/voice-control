@@ -12,5 +12,5 @@ Architecture Decision Records describe the current design constraints that shoul
 - [0001: Persistent wake listening recovers after audio interruption](0001-persistent-wake-listening.md)
 - [0002: Commands route through the frontmost supported application](0002-frontmost-application-routing.md)
 - [0003: Voice phrases are user configuration](0003-configured-voice-phrases.md)
-- [0004: Recording edits use the capture timeline](0004-recording-edits-use-capture-timeline.md)
+- [0004: Dictation uses local Parakeet](0004-local-parakeet-dictation.md)
 - [0005: Media control stops at playback transport](0005-media-control-stops-at-playback-transport.md)

@@ -75,15 +75,9 @@ final class PromptTranscriber {
   private let backend: any PromptTranscriberBackend
 
   init(contextualStrings: [String]) {
-    if #available(macOS 26.0, *) {
-      let backend = AppleSpeechTranscriber(contextualStrings: contextualStrings)
-      self.backend = backend
-      self.name = backend.name
-    } else {
-      let backend = ParakeetTranscriber()
-      self.backend = backend
-      self.name = backend.name
-    }
+    let backend = ParakeetTranscriber()
+    self.backend = backend
+    self.name = backend.name
   }
 
   init(backend: any PromptTranscriberBackend) {

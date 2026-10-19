@@ -122,13 +122,13 @@ final class ApplicationController {
           edit.insertion.isEmpty
           ? postKey(keyCode: 51, flags: []) : postText(edit.insertion)
         guard posted else { throw InjectionError("Could not revise the live transcription") }
-        try target.wait(for: target.edit.afterInsertion)
+        try target.waitForInsertion()
       } else if !edit.insertion.isEmpty {
         let target = try? EditablePreviewTarget(pid: targetPID, edit: edit)
         guard postText(edit.insertion) else {
           throw InjectionError("Could not type the live transcription")
         }
-        if let target { try target.wait(for: target.edit.afterInsertion) }
+        if let target { try target.waitForInsertion() }
       }
       return .success(())
     } catch {

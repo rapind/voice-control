@@ -6,6 +6,7 @@ struct PreviewFieldEdit: Equatable {
   let replacementRange: NSRange
   let afterDeletion: String
   let afterInsertion: String
+  private let insertionWithoutEmptyParagraph: String?
 
   init(text: String, selection: NSRange, edit: PreviewEdit) throws {
     guard edit.deleteCount >= 0, selection.location >= 0, selection.length >= 0,
@@ -27,6 +28,16 @@ struct PreviewFieldEdit: Equatable {
       length: selection.location + selection.length - prefix.utf16.count)
     afterDeletion = edit.deleteCount > 0 ? prefix + suffix : text
     afterInsertion = edit.insertion.isEmpty ? afterDeletion : prefix + edit.insertion + suffix
+    // An empty rich-text paragraph can expose a newline through Accessibility,
+    // then drop that newline on the first insertion. Accept either representation
+    // only for this empty baseline, without trimming real text or inserted newlines.
+    insertionWithoutEmptyParagraph =
+      text == "\n" && selection == NSRange(location: 0, length: 0)
+        && edit.deleteCount == 0 && !edit.insertion.isEmpty ? edit.insertion : nil
+  }
+
+  func acknowledgesInsertion(_ actual: String) -> Bool {
+    actual == afterInsertion || actual == insertionWithoutEmptyParagraph
   }
 }
 
@@ -122,14 +133,20 @@ struct EditablePreviewTarget {
     }
   }
 
-  func wait(for expected: String) throws {
+  func waitForInsertion() throws {
+    try wait(for: edit.afterInsertion, isInsertion: true)
+  }
+
+  private func wait(for expected: String, isInsertion: Bool = false) throws {
     let deadline = ProcessInfo.processInfo.systemUptime + 0.75
     repeat {
       guard NSWorkspace.shared.frontmostApplication?.processIdentifier == pid
       else { throw InjectionError("The captured application is no longer frontmost") }
       var value: CFTypeRef?
       let result = AXUIElementCopyAttributeValue(field, kAXValueAttribute as CFString, &value)
-      if result == .success, let actual = value as? String, actual == expected {
+      if result == .success, let actual = value as? String,
+        isInsertion ? edit.acknowledgesInsertion(actual) : actual == expected
+      {
         try checkFocus()
         return
       }

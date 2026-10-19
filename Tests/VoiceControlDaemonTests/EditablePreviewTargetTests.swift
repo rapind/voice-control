@@ -65,3 +65,49 @@ import Testing
       edit: PreviewEdit(deleteCount: -1, insertion: ""))
   }
 }
+
+@Test func previewAcknowledgesCodexRemovingItsEmptyParagraphOnFirstInsertion() throws {
+  // Captured AX values: the empty composer contains a newline; typing removes it.
+  let change = try PreviewFieldEdit(
+    text: "\n", selection: NSRange(location: 0, length: 0),
+    edit: PreviewEdit(deleteCount: 0, insertion: "The blue folder."))
+  #expect(change.acknowledgesInsertion("The blue folder."))
+  #expect(change.acknowledgesInsertion("The blue folder.\n"))
+  #expect(!change.acknowledgesInsertion("The blue"))
+  #expect(!change.acknowledgesInsertion("The blue folder. "))
+}
+
+@Test func previewAcknowledgementStillRequiresExistingTextAndInsertedNewlines() throws {
+  let existingText = try PreviewFieldEdit(
+    text: "Keep this\n", selection: NSRange(location: 0, length: 0),
+    edit: PreviewEdit(deleteCount: 0, insertion: "New words. "))
+  #expect(existingText.acknowledgesInsertion("New words. Keep this\n"))
+  #expect(!existingText.acknowledgesInsertion("New words."))
+  #expect(!existingText.acknowledgesInsertion("New words. Keep this"))
+
+  let insertedNewline = try PreviewFieldEdit(
+    text: "", selection: NSRange(location: 0, length: 0),
+    edit: PreviewEdit(deleteCount: 0, insertion: "New words.\n"))
+  #expect(!insertedNewline.acknowledgesInsertion("New words."))
+
+  let selectedNewline = try PreviewFieldEdit(
+    text: "\n", selection: NSRange(location: 0, length: 1),
+    edit: PreviewEdit(deleteCount: 0, insertion: "New words."))
+  #expect(selectedNewline.acknowledgesInsertion("New words."))
+  #expect(!selectedNewline.acknowledgesInsertion("New words.\n"))
+}
+
+@Test func previewAcknowledgementDoesNotTreatMultipleBlankLinesAsAnEmptyParagraph() throws {
+  let change = try PreviewFieldEdit(
+    text: "\n\n", selection: NSRange(location: 0, length: 0),
+    edit: PreviewEdit(deleteCount: 0, insertion: "The blue folder."))
+  #expect(change.acknowledgesInsertion("The blue folder.\n\n"))
+  #expect(!change.acknowledgesInsertion("The blue folder."))
+  #expect(!change.acknowledgesInsertion("The blue folder.\n"))
+
+  let caretAfterNewline = try PreviewFieldEdit(
+    text: "\n", selection: NSRange(location: 1, length: 0),
+    edit: PreviewEdit(deleteCount: 0, insertion: "New words."))
+  #expect(caretAfterNewline.acknowledgesInsertion("\nNew words."))
+  #expect(!caretAfterNewline.acknowledgesInsertion("New words."))
+}

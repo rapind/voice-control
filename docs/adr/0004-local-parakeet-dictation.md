@@ -21,8 +21,9 @@ Silence never submits a prompt. The configured submit phrase sends immediately, 
 - Dictation reuses local model files without downloading updates. The shared cache must contain Parakeet v3 before startup.
 - Model files in the shared cache are not checksum-pinned by this application. Replacing those files can change recognition behavior.
 - Earlier preview text can change during recording and at submission. Prefix-only retractions retain the accepted tail, which can also retain recognition mistakes until a later correction changes the words.
-- Live preview requires a writable Accessibility text selection, regardless of the application. Corrections confirm focus and the selected range, then replace that range in one operation. Live edits do not require exact field-value acknowledgement because clients can expose placeholder text that disappears on insertion. There is no separate deletion phase before replacement text is sent.
-- Clients without writable text selections receive one insertion at submission. They have no visible live preview.
+- Live preview types recognition updates without focus or field-readiness checks. The user controls input focus throughout dictation. There is no capability-based buffering until submission.
+- Corrections read the captured application's current field text and selection, confirm the replacement range, then replace it in one operation. There is no separate deletion phase before replacement text is sent. Native access to the text and selection is required for corrections; insertions do not query the field.
+- A missing focused field during a correction triggers best-effort native Accessibility activation when the client exposes that setting. Live edits do not require exact field-value acknowledgement because clients can expose placeholder text that disappears on insertion.
 - Wake and command recognition still depend on Apple's speech engine.
 - A trailing submit phrase is visible to clients that do not know the voice-control convention.
 - Agents configured for voice-control input must ignore the trailing submit phrase rather than act on it.

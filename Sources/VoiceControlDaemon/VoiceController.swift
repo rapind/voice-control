@@ -32,7 +32,6 @@ final class VoiceController {
   private var lastKeywordTranscript = ""
   private var preview = TranscriptPreview()
   private var liveTranscript = LiveTranscriptCheckpoint()
-  private var previewReady = false
   private var ambientNoiseFloor = AmbientNoiseFloor()
   private var speechBurstTracker = SpeechBurstTracker()
 
@@ -201,11 +200,6 @@ final class VoiceController {
       speechBurstTracker.reset()
       preview = TranscriptPreview()
       liveTranscript = LiveTranscriptCheckpoint()
-      previewReady = applicationController.supportsLivePreview(targetPID: targetPID)
-      if !previewReady {
-        print(
-          "The client cannot replace live text safely; dictation will be inserted on submission")
-      }
       promptCaptureStarted = false
       let confirmation = NSSound(named: "Tink")
       let captureDelay =
@@ -448,7 +442,7 @@ final class VoiceController {
   }
 
   private func applyPendingPreview() {
-    guard machine.phase == .recording, previewReady else { return }
+    guard machine.phase == .recording else { return }
     var nextPreview = preview
     let edit = nextPreview.replace(with: liveTranscript.latestText)
     guard edit.deleteCount > 0 || !edit.insertion.isEmpty else { return }
@@ -465,10 +459,6 @@ final class VoiceController {
 
   private func clearLivePreview() -> Result<Void, Error> {
     liveTranscript = LiveTranscriptCheckpoint()
-    guard previewReady else {
-      preview = TranscriptPreview()
-      return .success(())
-    }
     var emptyPreview = preview
     let edit = emptyPreview.replace(with: "")
     guard edit.deleteCount > 0 || !edit.insertion.isEmpty else { return .success(()) }

@@ -76,22 +76,6 @@ final class ApplicationController {
     }
   }
 
-  func supportsLivePreview(targetPID: pid_t?) -> Bool {
-    guard AXIsProcessTrusted(), let targetPID,
-      NSWorkspace.shared.frontmostApplication?.processIdentifier == targetPID
-    else { return false }
-    // Accessibility can briefly be busy as a field receives focus.
-    for attempt in 0..<3 {
-      if (try? EditablePreviewTarget(
-        pid: targetPID, edit: PreviewEdit(deleteCount: 0, insertion: ""))) != nil
-      {
-        return true
-      }
-      if attempt < 2 { Thread.sleep(forTimeInterval: 0.01) }
-    }
-    return false
-  }
-
   func applyPreviewEdit(
     _ edit: PreviewEdit,
     targetPID: pid_t?
@@ -105,11 +89,6 @@ final class ApplicationController {
     else {
       return .failure(InjectionError("The captured application is unavailable"))
     }
-    guard NSWorkspace.shared.frontmostApplication?.processIdentifier == targetPID else {
-      return .failure(
-        InjectionError("The captured application is no longer frontmost; transcription stopped"))
-    }
-
     guard edit.deleteCount >= 0 else {
       return .failure(InjectionError("The live transcription edit has an invalid deletion count"))
     }
@@ -122,13 +101,10 @@ final class ApplicationController {
           edit.insertion.isEmpty
           ? postKey(keyCode: 51, flags: []) : postText(edit.insertion)
         guard posted else { throw InjectionError("Could not revise the live transcription") }
-        try target.checkFocus()
       } else if !edit.insertion.isEmpty {
-        let target = try? EditablePreviewTarget(pid: targetPID, edit: edit)
         guard postText(edit.insertion) else {
           throw InjectionError("Could not type the live transcription")
         }
-        if let target { try target.checkFocus() }
       }
       return .success(())
     } catch {
@@ -149,11 +125,6 @@ final class ApplicationController {
     DispatchQueue.main.asyncAfter(
       deadline: .now() + SubmissionTiming.returnDelay(for: finalText)
     ) {
-      guard NSWorkspace.shared.frontmostApplication?.processIdentifier == targetPID else {
-        completion(
-          .failure(InjectionError("The captured application is no longer frontmost")))
-        return
-      }
       do {
         try self.pressReturnUsingSystemEvents()
         completion(.success(()))

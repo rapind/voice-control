@@ -35,29 +35,37 @@ struct PreviewFieldEdit: Equatable {
 struct EditablePreviewTarget {
   let edit: PreviewFieldEdit
   private let field: AXUIElement
-  private let application: AXUIElement
-  private let pid: pid_t
 
   init(pid: pid_t, edit: PreviewEdit) throws {
-    self.pid = pid
-    application = AXUIElementCreateApplication(pid)
+    let application = AXUIElementCreateApplication(pid)
     AXUIElementSetMessagingTimeout(application, 0.1)
     var focused: CFTypeRef?
-    guard
-      AXUIElementCopyAttributeValue(
-        application, kAXFocusedUIElementAttribute as CFString, &focused
-      ) == .success, let focused, CFGetTypeID(focused) == AXUIElementGetTypeID()
-    else { throw InjectionError("Could not read the client's focused text field") }
+    var focusResult = AXUIElementCopyAttributeValue(
+      application, kAXFocusedUIElementAttribute as CFString, &focused)
+    if focusResult == .noValue {
+      var enhanced: CFTypeRef?
+      if AXUIElementCopyAttributeValue(
+        application, "AXEnhancedUserInterface" as CFString, &enhanced) == .success,
+        enhanced as? Bool == false
+      {
+        // Native clients can populate their focused field asynchronously after
+        // Accessibility is enabled. The field query, not the setter status,
+        // determines whether the correction's selection can be read.
+        AXUIElementSetAttributeValue(
+          application, "AXEnhancedUserInterface" as CFString, kCFBooleanTrue)
+        focused = nil
+        focusResult = AXUIElementCopyAttributeValue(
+          application, kAXFocusedUIElementAttribute as CFString, &focused)
+      }
+    }
+    guard focusResult == .success, let focused,
+      CFGetTypeID(focused) == AXUIElementGetTypeID()
+    else {
+      throw InjectionError(
+        "Could not read the client's focused text field (AX \(focusResult.rawValue))")
+    }
     field = focused as! AXUIElement
     AXUIElementSetMessagingTimeout(field, 0.1)
-    var selectionSettable = DarwinBoolean(false)
-    guard
-      AXUIElementIsAttributeSettable(
-        field, kAXSelectedTextRangeAttribute as CFString, &selectionSettable) == .success,
-      selectionSettable.boolValue
-    else {
-      throw InjectionError("The client does not expose a writable text selection")
-    }
     var value: CFTypeRef?
     var selected: CFTypeRef?
     guard AXUIElementCopyAttributeValue(field, kAXValueAttribute as CFString, &value) == .success,
@@ -75,7 +83,6 @@ struct EditablePreviewTarget {
   }
 
   func selectReplacement() throws {
-    try checkFocus()
     var range = CFRange(
       location: edit.replacementRange.location, length: edit.replacementRange.length)
     guard let selection = AXValueCreate(.cfRange, &range),
@@ -85,7 +92,6 @@ struct EditablePreviewTarget {
 
     let deadline = ProcessInfo.processInfo.systemUptime + 0.75
     repeat {
-      try checkFocus()
       var selected: CFTypeRef?
       let result = AXUIElementCopyAttributeValue(
         field, kAXSelectedTextRangeAttribute as CFString, &selected)
@@ -94,7 +100,6 @@ struct EditablePreviewTarget {
         if AXValueGetValue(selected as! AXValue, .cfRange, &actual),
           actual.location == range.location, actual.length == range.length
         {
-          try checkFocus()
           return
         }
       }
@@ -106,17 +111,4 @@ struct EditablePreviewTarget {
     throw InjectionError("The client did not acknowledge the transcription selection")
   }
 
-  func checkFocus() throws {
-    guard NSWorkspace.shared.frontmostApplication?.processIdentifier == pid else {
-      throw InjectionError("The captured application is no longer frontmost")
-    }
-    var focused: CFTypeRef?
-    guard
-      AXUIElementCopyAttributeValue(application, kAXFocusedUIElementAttribute as CFString, &focused)
-        == .success,
-      let focused, CFEqual(focused, field)
-    else {
-      throw InjectionError("The client's focused text field changed during transcription")
-    }
-  }
 }

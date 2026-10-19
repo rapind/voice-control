@@ -18,6 +18,40 @@ import Testing
   #expect(transcript.latestText == "store this value as an array")
 }
 
+@Test func liveTranscriptKeepsASentenceWhenRecognitionTemporarilyRetractsIt() {
+  var transcript = LiveTranscriptCheckpoint()
+  let first = "The recorder should keep listening while I work out what I mean"
+  let visible = first + ". The words at the beginning are just as important as these words."
+  transcript.update(visible, audioEndTime: 48)
+
+  transcript.update(first, audioEndTime: 49)
+
+  #expect(transcript.latestText == visible)
+  #expect(transcript.latestAudioEndTime == 48)
+  transcript.update(visible + " There are three details.", audioEndTime: 50)
+  #expect(transcript.latestText == visible + " There are three details.")
+}
+
+@Test func liveTranscriptRetractionIgnoresPunctuationAndCapitalizationChanges() {
+  var transcript = LiveTranscriptCheckpoint()
+  transcript.update("The blue folder is here. The green notebook is beside it.")
+  transcript.update("the blue folder is here")
+  #expect(transcript.latestText == "The blue folder is here. The green notebook is beside it.")
+  transcript.update("")
+  #expect(transcript.latestText == "The blue folder is here. The green notebook is beside it.")
+}
+
+@Test func liveTranscriptStillAcceptsWordAndPunctuationCorrections() {
+  var transcript = LiveTranscriptCheckpoint()
+  transcript.update("We can apply the right fit.")
+  transcript.update("We can apply the right fix")
+  #expect(transcript.latestText == "We can apply the right fix")
+  transcript.update("We can apply the right fix.")
+  #expect(transcript.latestText == "We can apply the right fix.")
+  transcript.update("We can apply it.")
+  #expect(transcript.latestText == "We can apply it.")
+}
+
 @Test func emptyAuthoritativeLiveTranscriptFailsWithoutFullFileTranscription() async {
   let backend = PromptTranscriberBackendSpy(liveTranscriptIsAuthoritative: true)
   let transcriber = PromptTranscriber(backend: backend)

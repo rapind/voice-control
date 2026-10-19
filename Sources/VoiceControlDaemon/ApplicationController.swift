@@ -76,6 +76,22 @@ final class ApplicationController {
     }
   }
 
+  func supportsLivePreview(targetPID: pid_t?) -> Bool {
+    guard AXIsProcessTrusted(), let targetPID,
+      NSWorkspace.shared.frontmostApplication?.processIdentifier == targetPID
+    else { return false }
+    // Accessibility can briefly be busy as a field receives focus.
+    for attempt in 0..<3 {
+      if (try? EditablePreviewTarget(
+        pid: targetPID, edit: PreviewEdit(deleteCount: 0, insertion: ""))) != nil
+      {
+        return true
+      }
+      if attempt < 2 { Thread.sleep(forTimeInterval: 0.01) }
+    }
+    return false
+  }
+
   func applyPreviewEdit(
     _ edit: PreviewEdit,
     targetPID: pid_t?
@@ -99,21 +115,16 @@ final class ApplicationController {
     }
     guard edit.deleteCount > 0 || !edit.insertion.isEmpty else { return .success(()) }
     do {
-      let target =
-        SafariPreviewTarget.requiresAcknowledgement(bundleIdentifier: app.bundleIdentifier)
-        ? try SafariPreviewTarget(pid: targetPID, edit: edit) : nil
-      for _ in 0..<edit.deleteCount {
-        guard postKey(keyCode: 51, flags: []) else {
-          throw InjectionError("Could not revise the live transcription")
-        }
-      }
-      if edit.deleteCount > 0, let target {
-        try target.wait(for: target.edit.afterDeletion)
-      }
-      guard NSWorkspace.shared.frontmostApplication?.processIdentifier == targetPID else {
-        throw InjectionError("The captured application is no longer frontmost")
-      }
-      if !edit.insertion.isEmpty {
+      if edit.deleteCount > 0 {
+        let target = try EditablePreviewTarget(pid: targetPID, edit: edit)
+        try target.selectReplacement()
+        let posted =
+          edit.insertion.isEmpty
+          ? postKey(keyCode: 51, flags: []) : postText(edit.insertion)
+        guard posted else { throw InjectionError("Could not revise the live transcription") }
+        try target.wait(for: target.edit.afterInsertion)
+      } else if !edit.insertion.isEmpty {
+        let target = try? EditablePreviewTarget(pid: targetPID, edit: edit)
         guard postText(edit.insertion) else {
           throw InjectionError("Could not type the live transcription")
         }

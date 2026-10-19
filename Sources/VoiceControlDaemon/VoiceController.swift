@@ -201,7 +201,11 @@ final class VoiceController {
       speechBurstTracker.reset()
       preview = TranscriptPreview()
       liveTranscript = LiveTranscriptCheckpoint()
-      previewReady = targetPID != nil
+      previewReady = applicationController.supportsLivePreview(targetPID: targetPID)
+      if !previewReady {
+        print(
+          "The client cannot replace live text safely; dictation will be inserted on submission")
+      }
       promptCaptureStarted = false
       let confirmation = NSSound(named: "Tink")
       let captureDelay =
@@ -460,7 +464,7 @@ final class VoiceController {
   }
 
   private func clearLivePreview() -> Result<Void, Error> {
-    liveTranscript.update("")
+    liveTranscript = LiveTranscriptCheckpoint()
     guard previewReady else {
       preview = TranscriptPreview()
       return .success(())
@@ -531,12 +535,14 @@ final class VoiceController {
           transcript,
           wakePhrases: configuration.wakePhrases
         )
-        guard !cleaned.isEmpty else {
+        liveTranscript.update(cleaned)
+        let finalText = liveTranscript.latestText
+        guard !finalText.isEmpty else {
           fail("\(transcriber.name) returned an empty prompt")
           return
         }
-        print("Transcript: \(cleaned)")
-        dispatch(.transcriptionSucceeded(cleaned))
+        print("Transcript: \(finalText)")
+        dispatch(.transcriptionSucceeded(finalText))
       } catch {
         fail("Transcription failed: \(error.localizedDescription)")
       }

@@ -63,6 +63,13 @@ struct LiveTranscriptCheckpoint {
   private(set) var latestAudioEndTime: TimeInterval?
 
   mutating func update(_ text: String, audioEndTime: TimeInterval? = nil) {
+    // Full-context recognition can temporarily return only an earlier prefix.
+    // Keep the displayed tail until recognition catches up, while accepting
+    // corrections that actually change words or punctuation.
+    let previousWords = latestText.split { !$0.isLetter && !$0.isNumber }.map { $0.lowercased() }
+    let incomingWords = text.split { !$0.isLetter && !$0.isNumber }.map { $0.lowercased() }
+    guard !(incomingWords.count < previousWords.count && previousWords.starts(with: incomingWords))
+    else { return }
     latestText = text
     latestAudioEndTime = audioEndTime
   }

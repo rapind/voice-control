@@ -12,6 +12,20 @@ Use the default triage-role vocabulary as Beans tags. See `docs/agents/triage-la
 
 This is a single-context repository. See `docs/agents/domain.md`.
 
+## Voice behavior changes
+
+Voice regressions can depend on timing, pauses, and focus history, making
+them hard to reproduce and detect.
+
+- Before changing recording, recognition, wake/stop behavior, or transcript delivery,
+  explain the intended behavior and possible side effects and obtain explicit
+  user confirmation. An explicit request for that specific change counts as
+  confirmation. A general bug-fix request does not authorize extra features,
+  guards, restrictions, or fallbacks.
+- Keep changes narrow. Record each approved behavior change, its reason, and
+  verification in its Bean and commit description. State what was tested in
+  the affected client and what remains unverified.
+
 ## macOS Accessibility permissions
 
 Do not repeatedly launch an application while waiting for the user to grant

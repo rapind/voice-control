@@ -197,6 +197,7 @@ final class VoiceController {
 
     case .beginPromptRecording:
       captureSessionTarget()
+      applicationController.beginPreview()
       speechBurstTracker.reset()
       preview = TranscriptPreview()
       liveTranscript = LiveTranscriptCheckpoint()
@@ -452,6 +453,11 @@ final class VoiceController {
     ) {
     case .success:
       preview = nextPreview
+    case .failure(let error as CorrectionSelectionError):
+      // Keep the published checkpoint so the next update retries the correction.
+      logger.warning(
+        "Live correction deferred; recording continues: \(error.localizedDescription, privacy: .public)"
+      )
     case .failure(let error):
       fail(error.localizedDescription)
     }

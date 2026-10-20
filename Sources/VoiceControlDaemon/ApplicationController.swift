@@ -9,6 +9,7 @@ struct CapturedApplication {
 }
 
 final class ApplicationController {
+  private var pendingPreviewCorrection = PendingPreviewCorrection()
   static let youtubeMusicBundleIdentifier =
     "com.google.Chrome.app.cinhimbnkkaeohfgghhklpknlkffjgod"
   static let sleepScriptSource = "tell application \"System Events\" to sleep"
@@ -76,6 +77,10 @@ final class ApplicationController {
     }
   }
 
+  func beginPreview() {
+    pendingPreviewCorrection = PendingPreviewCorrection()
+  }
+
   func applyPreviewEdit(
     _ edit: PreviewEdit,
     targetPID: pid_t?
@@ -94,13 +99,15 @@ final class ApplicationController {
     }
     guard edit.deleteCount > 0 || !edit.insertion.isEmpty else { return .success(()) }
     do {
-      if edit.deleteCount > 0 {
-        let target = try EditablePreviewTarget(pid: targetPID, edit: edit)
-        try target.selectReplacement()
+      if edit.deleteCount > 0 || pendingPreviewCorrection.isPending {
+        try pendingPreviewCorrection.selectReplacement(for: edit) {
+          try EditablePreviewTarget(pid: targetPID)
+        }
         let posted =
           edit.insertion.isEmpty
           ? postKey(keyCode: 51, flags: []) : postText(edit.insertion)
         guard posted else { throw InjectionError("Could not revise the live transcription") }
+        pendingPreviewCorrection = PendingPreviewCorrection()
       } else if !edit.insertion.isEmpty {
         guard postText(edit.insertion) else {
           throw InjectionError("Could not type the live transcription")
@@ -810,4 +817,10 @@ struct InjectionError: LocalizedError {
   }
 
   var errorDescription: String? { message }
+}
+
+struct CorrectionSelectionError: LocalizedError {
+  let underlyingError: Error
+
+  var errorDescription: String? { underlyingError.localizedDescription }
 }

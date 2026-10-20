@@ -24,6 +24,7 @@ Silence never submits a prompt. The configured submit phrase sends immediately, 
 - Live preview types recognition updates without focus or field-readiness checks. The user controls input focus throughout dictation. There is no capability-based buffering until submission.
 - Corrections read the captured application's current field text and selection, confirm the replacement range, then replace it in one operation. There is no separate deletion phase before replacement text is sent. Native access to the text and selection is required for corrections; insertions do not query the field.
 - A missing focused field during a correction triggers best-effort native Accessibility activation when the client exposes that setting. Live edits do not require exact field-value acknowledgement because clients can expose placeholder text that disappears on insertion.
+- A live correction that cannot read the field or confirm its replacement selection leaves recording active and retains the last successfully published preview. A later recognition update retries from that checkpoint, so visible text may lag while native field access is unavailable. Submission still requires a successful final edit.
 - Wake and command recognition still depend on Apple's speech engine.
 - A trailing submit phrase is visible to clients that do not know the voice-control convention.
 - Agents configured for voice-control input must ignore the trailing submit phrase rather than act on it.

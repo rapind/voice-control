@@ -33,10 +33,11 @@ struct PreviewFieldEdit: Equatable {
 // Corrections replace one acknowledged selection. Field values can include
 // disappearing placeholders, so they are not used to acknowledge posted text.
 struct EditablePreviewTarget {
-  let edit: PreviewFieldEdit
   private let field: AXUIElement
+  private let text: String
+  private let selection: NSRange
 
-  init(pid: pid_t, edit: PreviewEdit) throws {
+  init(pid: pid_t) throws {
     let application = AXUIElementCreateApplication(pid)
     AXUIElementSetMessagingTimeout(application, 0.1)
     var focused: CFTypeRef?
@@ -77,14 +78,14 @@ struct EditablePreviewTarget {
     var selection = CFRange()
     guard AXValueGetValue(selected as! AXValue, .cfRange, &selection)
     else { throw InjectionError("Could not read the client's text selection") }
-    self.edit = try PreviewFieldEdit(
-      text: text, selection: NSRange(location: selection.location, length: selection.length),
-      edit: edit)
+    self.text = text
+    self.selection = NSRange(location: selection.location, length: selection.length)
   }
 
-  func selectReplacement() throws {
+  func selectReplacement(for edit: PreviewEdit) throws {
+    let replacement = try PreviewFieldEdit(text: text, selection: selection, edit: edit)
     var range = CFRange(
-      location: edit.replacementRange.location, length: edit.replacementRange.length)
+      location: replacement.replacementRange.location, length: replacement.replacementRange.length)
     guard let selection = AXValueCreate(.cfRange, &range),
       AXUIElementSetAttributeValue(field, kAXSelectedTextRangeAttribute as CFString, selection)
         == .success
@@ -111,4 +112,30 @@ struct EditablePreviewTarget {
     throw InjectionError("The client did not acknowledge the transcription selection")
   }
 
+}
+
+protocol PreviewCorrectionTarget {
+  func selectReplacement(for edit: PreviewEdit) throws
+}
+
+extension EditablePreviewTarget: PreviewCorrectionTarget {}
+
+struct PendingPreviewCorrection {
+  private var target: (any PreviewCorrectionTarget)?
+
+  var isPending: Bool { target != nil }
+
+  mutating func selectReplacement(
+    for edit: PreviewEdit,
+    makeTarget: () throws -> any PreviewCorrectionTarget
+  ) throws {
+    do {
+      // Selection may have moved even when acknowledgement failed. Retain the
+      // original field snapshot until text is posted, so retries do not delete twice.
+      if target == nil { target = try makeTarget() }
+      try target?.selectReplacement(for: edit)
+    } catch {
+      throw CorrectionSelectionError(underlyingError: error)
+    }
+  }
 }
